@@ -1,0 +1,161 @@
+@import './tokens.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* iOS: keep form fields at 16px so Safari doesn't zoom the viewport on focus. */
+@media (max-width: 720px) {
+  input, select, textarea { font-size: 16px !important; }
+  .input-sm, .select-sm { font-size: 15px !important; }
+}
+
+#root { min-height: 100vh; }
+
+h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+
+p { margin: 0; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hover); }
+
+button { font-family: inherit; }
+
+input, select, textarea, button { font-family: inherit; font-size: 100%; }
+
+::placeholder { color: var(--text-faint); }
+
+img { max-width: 100%; display: block; }
+
+::selection { background: var(--accent-soft-bg); color: var(--accent-soft-text); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 100px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: oklch(75% 0.02 150); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Keyframes */
+@keyframes aidly-spin { to { transform: rotate(360deg); } }
+@keyframes aidly-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes aidly-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aidly-toast-in { from { opacity: 0; transform: translateY(-10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes aidly-pulse-ring { 0% { box-shadow: 0 0 0 0 oklch(54% 0.19 25 / 0.45); } 70% { box-shadow: 0 0 0 7px oklch(54% 0.19 25 / 0); } 100% { box-shadow: 0 0 0 0 oklch(54% 0.19 25 / 0); } }
+@keyframes aidly-pop { 0% { transform: scale(0.85); opacity: 0; } 60% { transform: scale(1.04); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes aidly-slide-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes aidly-bell-ring { 0%, 100% { transform: rotate(0deg); } 10% { transform: rotate(-14deg); } 20% { transform: rotate(12deg); } 30% { transform: rotate(-9deg); } 40% { transform: rotate(7deg); } 50% { transform: rotate(-4deg); } 60% { transform: rotate(2deg); } }
+@keyframes aidly-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes aidly-topbar-slide { 0% { transform: translateX(-100%); } 50% { transform: translateX(0%); } 100% { transform: translateX(100%); } }
+@keyframes aidly-skeleton { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes aidly-aurora {
+  0%   { background-position: -12% -18%, 112% -8%,  38% 118%, 70% 40%; }
+  33%  { background-position:   6%  14%,  88% 22%,  55%  92%, 40% 58%; }
+  66%  { background-position: -18%   6%,  96% 40%,  30% 100%, 60% 30%; }
+  100% { background-position: -12% -18%, 112% -8%,  38% 118%, 70% 40%; }
+}
+@keyframes aidly-fade-in-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes aidly-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--glow-color, oklch(60% 0.12 152 / 0.35)); }
+  50% { box-shadow: 0 0 0 10px var(--glow-color, oklch(60% 0.12 152 / 0)); }
+}
+@keyframes aidly-ring-sweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes aidly-count-tick { from { opacity: 0.4; } to { opacity: 1; } }
+@keyframes aidly-route-in { from { opacity: 0; transform: translateY(10px) scale(0.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes aidly-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes aidly-stroke-draw { to { stroke-dashoffset: 0; } }
+@keyframes aidly-stat-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+.fade-in { animation: aidly-fade-in 0.28s ease both; }
+.fade-in-up { animation: aidly-fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Route-change transition: a fresh key on the outlet wrapper remounts this
+   on every navigation, so the enter animation replays each time. */
+.route-transition { animation: aidly-route-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Scroll-reveal: paired with the useReveal hook / <Reveal> component. */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1), transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-visible { opacity: 1; transform: translateY(0); }
+
+/* Ambient, slow-drifting colorful backdrop — decorative, kept low-contrast so
+   it never competes with foreground content or text legibility. */
+.aurora-bg {
+  background-image:
+    radial-gradient(420px circle, oklch(88% 0.07 152 / 0.5), transparent 62%),
+    radial-gradient(380px circle, oklch(86% 0.08 292 / 0.4), transparent 62%),
+    radial-gradient(460px circle, oklch(88% 0.09 70 / 0.35), transparent 62%),
+    radial-gradient(360px circle, oklch(87% 0.08 200 / 0.32), transparent 62%);
+  background-repeat: no-repeat;
+  background-position: -12% -18%, 112% -8%, 38% 118%, 70% 40%;
+  animation: aidly-aurora 28s ease-in-out infinite;
+  will-change: background-position;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Layout helpers */
+.container { max-width: var(--content-max); margin: 0 auto; }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+@media (max-width: 900px) {
+  .respo-shell { grid-template-columns: 1fr !important; }
+  .respo-mobile-topbar { display: flex !important; }
+  .respo-content-split { grid-template-columns: 1fr !important; }
+  .respo-content { padding: 20px 16px 80px !important; }
+}
+@media (max-width: 720px) {
+  .respo-login-split { grid-template-columns: 1fr !important; max-width: 440px !important; }
+  .respo-login-pane { padding: 32px 24px !important; }
+  .respo-two-col { grid-template-columns: 1fr !important; }
+  .respo-three-col { grid-template-columns: 1fr !important; }
+  .respo-stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+
+  /* Primary form actions become full-width, easy-to-tap targets. */
+  form button[type='submit'].btn { width: 100%; }
+
+  /* Compact buttons still need a comfortable touch target on mobile. */
+  .btn-sm { padding: 9px 14px; min-height: 38px; }
+  .btn-icon { min-width: 38px; min-height: 38px; }
+}
+@media (max-width: 440px) {
+  .respo-stats-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Toasts: keep clear of the mobile topbar and avoid edge-to-edge crowding. */
+@media (max-width: 640px) {
+  .toast-stack {
+    top: 70px;
+    left: 12px;
+    right: 12px;
+    max-width: none;
+  }
+  .slow-hint { max-width: calc(100vw - 40px); text-align: center; font-size: 12px; }
+}

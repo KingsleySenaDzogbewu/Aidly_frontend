@@ -1,0 +1,49 @@
+import { useNotifications } from '../features/notifications/NotificationsContext';
+import { Button, Card, SkeletonList, EmptyState, Icons, Reveal } from '../components/ui';
+import { fmtDateTime } from '../utils/format';
+
+export default function NotificationsPage() {
+  const { items, loading, markRead } = useNotifications();
+
+  return (
+    <div className="fade-in">
+      <h1 className="page-title">Notifications</h1>
+      <p className="page-subtitle" style={{ marginBottom: 22 }}>Updates about bookings, lessons and account activity.</p>
+
+      {loading && items.length === 0 ? (
+        <SkeletonList count={3} />
+      ) : items.length === 0 ? (
+        <EmptyState icon={<Icons.IconBell size={22} />} title="No notifications yet">
+          You&rsquo;re all caught up.
+        </EmptyState>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {items.map((n, i) => {
+            const unread = !n.readAt;
+            return (
+              <Reveal key={n.id} delay={Math.min(i, 8) * 40}>
+                <Card tight hover style={{ background: unread ? 'var(--accent-soft-bg)' : 'var(--surface)' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {unread && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />}
+                        <div style={{ fontSize: 14.5, fontWeight: 700 }}>{n.subject}</div>
+                      </div>
+                      <div style={{ fontSize: 13.5, color: 'var(--text)', marginTop: 6 }}>{n.body}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>{n.channel} · {fmtDateTime(n.sentAt)}</div>
+                    </div>
+                    {unread && (
+                      <Button size="sm" variant="outline" onClick={() => markRead(n.id)} style={{ flexShrink: 0 }}>
+                        Mark read
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              </Reveal>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

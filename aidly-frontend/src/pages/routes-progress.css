@@ -1,0 +1,56 @@
+.theory-ring {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: conic-gradient(
+    from -90deg,
+    var(--hue-amber) 0%,
+    var(--accent) var(--ring-pct, 0%),
+    var(--border) 0
+  );
+  transition: background 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: aidly-glow-pulse 2.4s ease-in-out infinite;
+}
+.theory-ring-inner {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.license-stage-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  z-index: 1;
+  flex-shrink: 0;
+  transition: background 0.4s ease, border-color 0.4s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.license-stage-dot-current {
+  animation: aidly-glow-pulse 1.8s ease-in-out infinite;
+  transform: scale(1.15);
+}
+
+/* The connector leading into the *next* (not-yet-reached) stage gets a
+   flowing dashed line instead of the flat "not done" grey — a small cue
+   that progress is headed that way next. */
+.stage-connector-flow {
+  background-image: repeating-linear-gradient(90deg, var(--flow-color, var(--accent)) 0 6px, transparent 6px 12px);
+  background-size: 24px 2px;
+  opacity: 0.5;
+  animation: aidly-connector-flow 1s linear infinite;
+}
+@keyframes aidly-connector-flow {
+  from { background-position: 0 0; }
+  to { background-position: 24px 0; }
+}
