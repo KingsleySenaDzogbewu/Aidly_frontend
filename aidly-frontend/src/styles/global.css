@@ -128,15 +128,18 @@ img { max-width: 100%; display: block; }
 @media (max-width: 900px) {
   .respo-shell { grid-template-columns: 1fr !important; }
   .respo-mobile-topbar { display: flex !important; }
-  .respo-content-split { grid-template-columns: 1fr !important; }
+  .respo-content-split,
+  .respo-two-col,
+  .respo-three-col,
+  .respo-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
   .respo-content { padding: 20px 16px 80px !important; }
 }
 @media (max-width: 720px) {
   .respo-login-split { grid-template-columns: 1fr !important; max-width: 440px !important; }
   .respo-login-pane { padding: 32px 24px !important; }
-  .respo-two-col { grid-template-columns: 1fr !important; }
-  .respo-three-col { grid-template-columns: 1fr !important; }
-  .respo-stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  .respo-stats-grid { gap: 10px !important; }
 
   /* Primary form actions become full-width, easy-to-tap targets. */
   form button[type='submit'].btn { width: 100%; }

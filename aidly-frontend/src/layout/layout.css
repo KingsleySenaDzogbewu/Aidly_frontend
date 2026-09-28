@@ -105,5 +105,19 @@
 .content { padding: 32px 40px 60px; max-width: var(--content-max); }
 
 @media (max-width: 900px) {
+  .shell {
+    display: block;
+    min-height: 100vh;
+  }
+
+  .sidebar:not(.mobile) {
+    display: none;
+  }
+
   .mobile-topbar { display: flex; }
+
+  .content {
+    padding: 20px 16px 80px;
+    max-width: 100%;
+  }
 }
