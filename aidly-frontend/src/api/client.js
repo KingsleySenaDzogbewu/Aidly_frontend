@@ -3,7 +3,7 @@ import { getAuthState, setSession, clearSession } from '../auth/tokenStore';
 import { busyStart, busyEnd } from './busyStore';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
-  || 'https://driving-school-backend-production-1988.up.railway.app/api/v1';
+  || 'https://driving-school-backend-1hjt.onrender.com/api/v1';
 
 export class ApiError extends Error {
   constructor(message, status, payload) {
