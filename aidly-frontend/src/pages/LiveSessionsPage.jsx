@@ -82,8 +82,9 @@ export default function LiveSessionsPage() {
   };
 
   const register = async (id) => {
+    if (!user?.studentProfileId) { toast.error('No student profile on this account'); return; }
     try {
-      await LiveSessionApi.register(id);
+      await LiveSessionApi.register(id, user.studentProfileId);
       toast.success('Registered for session');
       load();
     } catch (err) { toast.error(err.message); }
