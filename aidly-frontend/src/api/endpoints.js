@@ -86,9 +86,28 @@ export const VideoLessonApi = {
 };
 
 export const ResourceApi = {
+  // External link resource (uploaded=false, opened via fileUrl).
   create: (payload) => http.post('/resources', payload),
   remove: (resourceId) => http.delete(`/resources/${resourceId}`),
   listByLesson: (lessonId) => http.get(`/resources/lesson/${lessonId}`),
+
+  // Uploaded PDF resources (uploaded=true) - multipart, stored by the backend.
+  upload: (lessonId, title, file, onUploadProgress) => {
+    const form = new FormData();
+    form.append('lessonId', lessonId);
+    form.append('title', title);
+    form.append('file', file);
+    return http.post('/resources/upload', form, onUploadProgress ? { onUploadProgress } : undefined);
+  },
+  rename: (resourceId, title) => http.put(`/resources/${resourceId}`, { title }),
+  replaceFile: (resourceId, file, onUploadProgress) => {
+    const form = new FormData();
+    form.append('file', file);
+    return http.put(`/resources/${resourceId}/file`, form, onUploadProgress ? { onUploadProgress } : undefined);
+  },
+  // Needs the auth header, so it's fetched as a blob rather than linked to directly.
+  download: (resourceId, inline = false) =>
+    http.get(`/resources/${resourceId}/download`, { params: { inline }, responseType: 'blob' }),
 };
 
 export const QuizApi = {

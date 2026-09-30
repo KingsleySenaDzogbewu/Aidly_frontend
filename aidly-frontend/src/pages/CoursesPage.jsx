@@ -1,81 +1,304 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { CourseApi, VideoLessonApi, ResourceApi, SchoolApi, InstructorApi } from '../api/endpoints';
-import { Button, Card, Badge, Input, Textarea, Select, SkeletonList, EmptyState, Icons, Reveal } from '../components/ui';
+import { Button, Card, Badge, Input, Textarea, Select, SkeletonList, EmptyState, Icons, Reveal, Modal } from '../components/ui';
 import useIsMobile from '../hooks/useIsMobile';
 
 const RESOURCE_TYPES = ['PDF', 'DOCUMENT', 'LINK', 'IMAGE', 'OTHER'];
+const MAX_PDF_BYTES = 50 * 1024 * 1024;
 
-function ResourcesPanel({ lessonId, canManage, toast }) {
+// Same rules the backend enforces (PDF only, 50 MB max) - checked here first
+// so the user gets an instant message instead of waiting on a failed upload.
+function pdfError(file) {
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  if (!isPdf) return 'Only PDF files can be uploaded.';
+  if (file.size > MAX_PDF_BYTES) return 'That PDF is larger than 50 MB.';
+  return null;
+}
+
+function fmtSize(bytes) {
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function ProgressBar({ percent }) {
+  return (
+    <div style={{ height: 6, borderRadius: 100, background: 'var(--border)', overflow: 'hidden' }}>
+      <div style={{ width: `${percent}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.2s ease' }} />
+    </div>
+  );
+}
+
+const iconBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', flexShrink: 0, padding: 2 };
+
+function ResourcesPanel({ lessonId, canManage, toast, onCountChange }) {
   const [resources, setResources] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: '', fileUrl: '', type: 'PDF' });
+
+  // Upload a PDF
+  const [picked, setPicked] = useState(null); // { file, title }
+  const [uploadPct, setUploadPct] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  // Add an external link instead
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [linkForm, setLinkForm] = useState({ title: '', fileUrl: '', type: 'LINK' });
   const [busy, setBusy] = useState(false);
 
+  // Per-item actions
+  const [renaming, setRenaming] = useState(null); // { id, title }
+  const [replacing, setReplacing] = useState(null); // { id, pct }
+  const [deleteTarget, setDeleteTarget] = useState(null); // resource
+  const [deleting, setDeleting] = useState(false);
+  const replaceInputRef = useRef(null);
+  const replaceTargetRef = useRef(null);
+
   const load = async () => {
-    try { setResources(await ResourceApi.listByLesson(lessonId) || []); }
-    catch (err) { toast.error(err.message); }
+    try {
+      const list = await ResourceApi.listByLesson(lessonId) || [];
+      setResources(list);
+      onCountChange?.(lessonId, list.length);
+    } catch (err) { toast.error(err.message); }
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [lessonId]);
 
-  const add = async (e) => {
+  const pickFile = (file) => {
+    if (!file) return;
+    const error = pdfError(file);
+    if (error) { toast.error(error); return; }
+    setPicked({ file, title: file.name.replace(/\.pdf$/i, '') });
+  };
+
+  const upload = async (e) => {
+    e.preventDefault();
+    setUploadPct(0);
+    try {
+      await ResourceApi.upload(lessonId, picked.title.trim(), picked.file, (evt) => {
+        if (evt.total) setUploadPct(Math.round((evt.loaded / evt.total) * 100));
+      });
+      setPicked(null);
+      toast.success('Material uploaded');
+      load();
+    } catch (err) { toast.error(err.message); }
+    finally { setUploadPct(null); }
+  };
+
+  const addLink = async (e) => {
     e.preventDefault();
     setBusy(true);
     try {
-      await ResourceApi.create({ lessonId, title: form.title, fileUrl: form.fileUrl, type: form.type });
-      setForm({ title: '', fileUrl: '', type: 'PDF' });
-      setShowForm(false);
+      await ResourceApi.create({ lessonId, title: linkForm.title, fileUrl: linkForm.fileUrl, type: linkForm.type });
+      setLinkForm({ title: '', fileUrl: '', type: 'LINK' });
+      setShowLinkForm(false);
       load();
-      toast.success('Resource added');
+      toast.success('Link added');
     } catch (err) { toast.error(err.message); }
     finally { setBusy(false); }
   };
 
-  const remove = async (id) => {
-    try { await ResourceApi.remove(id); load(); toast.success('Resource removed'); }
-    catch (err) { toast.error(err.message); }
+  // The tab is opened synchronously, inside the click, so popup blockers
+  // allow it - the PDF is loaded into it once the authenticated fetch returns.
+  const view = async (r) => {
+    const win = window.open('', '_blank');
+    if (win) win.document.write('<p style="font-family:system-ui,sans-serif;padding:24px;color:#555">Loading PDF…</p>');
+    try {
+      const blob = await ResourceApi.download(r.id, true);
+      const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      if (win) win.location.href = url;
+      else window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      if (win) win.close();
+      toast.error(err.message);
+    }
   };
 
-  if (resources === null) return <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>Loading resources…</div>;
+  const download = async (r) => {
+    try {
+      const blob = await ResourceApi.download(r.id, false);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = r.fileName || `${r.title}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const saveRename = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await ResourceApi.rename(renaming.id, renaming.title.trim());
+      setRenaming(null);
+      toast.success('Material renamed');
+      load();
+    } catch (err) { toast.error(err.message); }
+    finally { setBusy(false); }
+  };
+
+  const startReplace = (r) => {
+    replaceTargetRef.current = r.id;
+    replaceInputRef.current?.click();
+  };
+
+  const replace = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    const id = replaceTargetRef.current;
+    if (!file || !id) return;
+    const error = pdfError(file);
+    if (error) { toast.error(error); return; }
+    setReplacing({ id, pct: 0 });
+    try {
+      await ResourceApi.replaceFile(id, file, (evt) => {
+        if (evt.total) setReplacing({ id, pct: Math.round((evt.loaded / evt.total) * 100) });
+      });
+      toast.success('File replaced — students get the new version');
+      load();
+    } catch (err) { toast.error(err.message); }
+    finally { setReplacing(null); }
+  };
+
+  const confirmDelete = async () => {
+    setDeleting(true);
+    try {
+      await ResourceApi.remove(deleteTarget.id);
+      setDeleteTarget(null);
+      toast.success('Material deleted');
+      load();
+    } catch (err) { toast.error(err.message); }
+    finally { setDeleting(false); }
+  };
+
+  if (resources === null) return <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>Loading materials…</div>;
 
   return (
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
-      {resources.length === 0 && !showForm && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No resources attached.</div>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {resources.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>No materials attached.</div>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {resources.map((r) => (
-          <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5, gap: 8, flexWrap: 'wrap' }}>
-            <a href={r.fileUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, wordBreak: 'break-word' }}>
-              <Icons.IconFile size={13} style={{ flexShrink: 0 }} /> {r.title} <span style={{ color: 'var(--text-faint)' }}>({r.type})</span>
-            </a>
-            {canManage && (
-              <button type="button" onClick={() => remove(r.id)} aria-label="Delete resource" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', flexShrink: 0 }}>
-                <Icons.IconTrash size={13} />
-              </button>
+          <div key={r.id} style={{ fontSize: 12.5 }}>
+            {renaming?.id === r.id ? (
+              <form onSubmit={saveRename} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <Input size="sm" required maxLength={200} autoFocus value={renaming.title} onChange={(e) => setRenaming((x) => ({ ...x, title: e.target.value }))} style={{ flex: '1 1 180px' }} />
+                <Button size="sm" type="submit" loading={busy}>Save</Button>
+                <Button size="sm" type="button" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button>
+              </form>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                {r.uploaded ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, wordBreak: 'break-word' }}>
+                    <Icons.IconFile size={13} style={{ flexShrink: 0 }} /> {r.title}
+                    <span style={{ color: 'var(--text-faint)' }}>(PDF{r.fileSize ? ` · ${fmtSize(r.fileSize)}` : ''})</span>
+                  </span>
+                ) : (
+                  <a href={r.fileUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, wordBreak: 'break-word' }}>
+                    <Icons.IconFile size={13} style={{ flexShrink: 0 }} /> {r.title} <span style={{ color: 'var(--text-faint)' }}>({r.type} link ↗)</span>
+                  </a>
+                )}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
+                  {r.uploaded && (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={() => view(r)}><Icons.IconEye size={13} /> View</Button>
+                      <Button size="sm" variant="ghost" onClick={() => download(r)}><Icons.IconDownload size={13} /> Download</Button>
+                    </>
+                  )}
+                  {canManage && (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={() => setRenaming({ id: r.id, title: r.title })}>Rename</Button>
+                      {r.uploaded && (
+                        <Button size="sm" variant="ghost" loading={replacing?.id === r.id} onClick={() => startReplace(r)}>
+                          <Icons.IconUpload size={13} /> Replace
+                        </Button>
+                      )}
+                      <button type="button" onClick={() => setDeleteTarget(r)} aria-label={`Delete ${r.title}`} style={iconBtnStyle}>
+                        <Icons.IconTrash size={13} />
+                      </button>
+                    </>
+                  )}
+                </span>
+              </div>
             )}
+            {replacing?.id === r.id && <div style={{ marginTop: 6 }}><ProgressBar percent={replacing.pct} /></div>}
           </div>
         ))}
       </div>
+
       {canManage && (
-        showForm ? (
-          <form onSubmit={add} style={{ marginTop: 8, display: 'grid', gap: 6 }}>
-            <Input size="sm" required placeholder="Resource title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-            <Input size="sm" required placeholder="File URL" value={form.fileUrl} onChange={(e) => setForm((f) => ({ ...f, fileUrl: e.target.value }))} />
-            <div style={{ display: 'flex', gap: 6 }}>
-              <Select size="sm" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
-                {RESOURCE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </Select>
-              <Button size="sm" type="submit" loading={busy}>Add</Button>
-              <Button size="sm" type="button" variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
-            </div>
-          </form>
-        ) : (
-          <button type="button" onClick={() => setShowForm(true)} className="btn btn-ghost btn-sm" style={{ marginTop: 6, padding: '4px 0' }}>
-            <Icons.IconPlus size={12} /> Add resource
-          </button>
-        )
+        <div style={{ marginTop: 12 }}>
+          <input ref={replaceInputRef} type="file" accept="application/pdf" onChange={replace} style={{ display: 'none' }} />
+
+          {picked ? (
+            <form onSubmit={upload} style={{ display: 'grid', gap: 8, padding: 12, borderRadius: 10, background: 'var(--surface-muted)' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', wordBreak: 'break-all' }}>
+                <Icons.IconFile size={12} /> {picked.file.name} · {fmtSize(picked.file.size)}
+              </div>
+              <Input size="sm" required maxLength={200} placeholder="Title students will see" value={picked.title} onChange={(e) => setPicked((p) => ({ ...p, title: e.target.value }))} disabled={uploadPct !== null} />
+              {uploadPct !== null && <ProgressBar percent={uploadPct} />}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Button size="sm" type="submit" loading={uploadPct !== null}>
+                  {uploadPct !== null ? `Uploading… ${uploadPct}%` : 'Upload'}
+                </Button>
+                <Button size="sm" type="button" variant="ghost" disabled={uploadPct !== null} onClick={() => setPicked(null)}>Cancel</Button>
+              </div>
+            </form>
+          ) : (
+            <label
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0]); }}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '16px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+                border: `1.5px dashed ${dragOver ? 'var(--accent)' : 'var(--border-strong)'}`,
+                background: dragOver ? 'var(--accent-soft-bg)' : 'transparent',
+                transition: 'border-color 0.15s ease, background 0.15s ease',
+              }}
+            >
+              <Icons.IconUpload size={18} style={{ color: 'var(--accent)' }} />
+              <span style={{ fontSize: 12.5, fontWeight: 600 }}>Add material — drag a PDF here, or click to choose</span>
+              <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>PDF only, up to 50 MB</span>
+              <input type="file" accept="application/pdf" onChange={(e) => { pickFile(e.target.files?.[0]); e.target.value = ''; }} style={{ display: 'none' }} />
+            </label>
+          )}
+
+          {showLinkForm ? (
+            <form onSubmit={addLink} style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+              <Input size="sm" required placeholder="Link title" value={linkForm.title} onChange={(e) => setLinkForm((f) => ({ ...f, title: e.target.value }))} />
+              <Input size="sm" required type="url" placeholder="https://…" value={linkForm.fileUrl} onChange={(e) => setLinkForm((f) => ({ ...f, fileUrl: e.target.value }))} />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Select size="sm" value={linkForm.type} onChange={(e) => setLinkForm((f) => ({ ...f, type: e.target.value }))}>
+                  {RESOURCE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </Select>
+                <Button size="sm" type="submit" loading={busy}>Add link</Button>
+                <Button size="sm" type="button" variant="ghost" onClick={() => setShowLinkForm(false)}>Cancel</Button>
+              </div>
+            </form>
+          ) : (
+            <button type="button" onClick={() => setShowLinkForm(true)} className="btn btn-ghost btn-sm" style={{ marginTop: 6, padding: '4px 0' }}>
+              <Icons.IconPlus size={12} /> Add a link instead
+            </button>
+          )}
+        </div>
       )}
+
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete this material?"
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="danger-solid" loading={deleting} onClick={confirmDelete}>Delete</Button>
+          </>
+        )}
+      >
+        <p style={{ fontSize: 13.5, color: 'var(--text-muted)' }}>
+          &ldquo;{deleteTarget?.title}&rdquo; will be removed from this lesson{deleteTarget?.uploaded ? ' and its file deleted' : ''}. Students will no longer see it. This can&rsquo;t be undone.
+        </p>
+      </Modal>
     </div>
   );
 }
@@ -101,6 +324,18 @@ export default function CoursesPage() {
   const [lessonForm, setLessonForm] = useState({ title: '', description: '', videoUrl: '', lessonOrder: 1, durationSeconds: '' });
   const [addingLesson, setAddingLesson] = useState(false);
   const [expandedLessonId, setExpandedLessonId] = useState(null);
+  const [materialCounts, setMaterialCounts] = useState({}); // lessonId -> number of materials
+
+  const setMaterialCount = (lessonId, count) => setMaterialCounts((c) => ({ ...c, [lessonId]: count }));
+
+  // The lesson list doesn't include a materials count, so fetch each lesson's
+  // list once to show "Materials (n)" on the row without opening it.
+  const loadMaterialCounts = async (list) => {
+    const results = await Promise.allSettled(list.map((l) => ResourceApi.listByLesson(l.id)));
+    const counts = {};
+    results.forEach((r, i) => { if (r.status === 'fulfilled') counts[list[i].id] = (r.value || []).length; });
+    setMaterialCounts((c) => ({ ...c, ...counts }));
+  };
 
   const loadCourses = async () => {
     setLoading(true);
@@ -151,9 +386,13 @@ export default function CoursesPage() {
     setSelectedId(id);
     setExpandedLessonId(null);
     setLessonsLoading(true);
-    try { setLessons(await VideoLessonApi.listByCourse(id) || []); }
-    catch (err) { toast.error(err.message); }
+    let list = [];
+    try {
+      list = await VideoLessonApi.listByCourse(id) || [];
+      setLessons(list);
+    } catch (err) { toast.error(err.message); }
     finally { setLessonsLoading(false); }
+    if (list.length > 0) loadMaterialCounts(list);
   };
 
   const courseAction = async (courseId, action) => {
@@ -168,7 +407,7 @@ export default function CoursesPage() {
     e.preventDefault();
     setAddingLesson(true);
     try {
-      await VideoLessonApi.create({
+      const created = await VideoLessonApi.create({
         courseId: selectedId,
         title: lessonForm.title,
         description: lessonForm.description || null,
@@ -176,10 +415,12 @@ export default function CoursesPage() {
         lessonOrder: Number(lessonForm.lessonOrder),
         durationSeconds: lessonForm.durationSeconds ? Number(lessonForm.durationSeconds) : null,
       });
-      toast.success('Lesson added');
+      toast.success('Lesson added — you can attach PDF materials to it now');
       setShowLessonForm(false);
       setLessonForm({ title: '', description: '', videoUrl: '', lessonOrder: lessons.length + 2, durationSeconds: '' });
-      selectCourse(selectedId);
+      await selectCourse(selectedId);
+      // Open the new lesson's materials straight away so the next step is obvious.
+      if (created?.id) setExpandedLessonId(created.id);
     } catch (err) { toast.error(err.message); }
     finally { setAddingLesson(false); }
   };
@@ -268,7 +509,7 @@ export default function CoursesPage() {
         )}
         {!selectedCourse ? (
           <EmptyState icon={<Icons.IconBook size={22} />} title="Select a course">
-            Pick a course on the left to see its lessons and resources.
+            Pick a course on the left to see its lessons and materials.
           </EmptyState>
         ) : (
           <Card>
@@ -290,14 +531,19 @@ export default function CoursesPage() {
 
             <div className="divider" />
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>Video lessons</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: canManage && lessons.length > 0 ? 4 : 12 }}>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>Lessons</div>
               {canManage && (
                 <Button size="sm" variant="soft" onClick={() => setShowLessonForm((s) => !s)}>
                   <Icons.IconPlus size={12} /> Add lesson
                 </Button>
               )}
             </div>
+            {canManage && lessons.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                Attach PDF materials to any lesson with its <strong>Materials</strong> button.
+              </div>
+            )}
 
             {showLessonForm && (
               <Card tight className="fade-in respo-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14, background: 'var(--surface-muted)' }}>
@@ -315,7 +561,18 @@ export default function CoursesPage() {
             {lessonsLoading ? (
               <SkeletonList count={2} small />
             ) : lessons.length === 0 ? (
-              <EmptyState title="No video lessons yet" />
+              <EmptyState icon={<Icons.IconBook size={22} />} title="No lessons yet">
+                {canManage ? (
+                  <>
+                    <div>Add a lesson first — PDF materials are attached to lessons.</div>
+                    {!showLessonForm && (
+                      <Button size="sm" style={{ marginTop: 12 }} onClick={() => setShowLessonForm(true)}>
+                        <Icons.IconPlus size={12} /> Add lesson
+                      </Button>
+                    )}
+                  </>
+                ) : 'Lessons will appear here once they’re published.'}
+              </EmptyState>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {lessons.map((v, i) => (
@@ -328,9 +585,15 @@ export default function CoursesPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                        <Button size="sm" variant="ghost" onClick={() => setExpandedLessonId(expandedLessonId === v.id ? null : v.id)}>
-                          {expandedLessonId === v.id ? 'Hide' : 'Resources'}
-                        </Button>
+                        {/* Students don't need a button for a lesson with nothing attached. */}
+                        {(canManage || materialCounts[v.id] !== 0) && (
+                          <Button size="sm" variant="ghost" onClick={() => setExpandedLessonId(expandedLessonId === v.id ? null : v.id)}>
+                            <Icons.IconFile size={13} />
+                            {expandedLessonId === v.id
+                              ? 'Hide materials'
+                              : `Materials${materialCounts[v.id] != null ? ` (${materialCounts[v.id]})` : ''}`}
+                          </Button>
+                        )}
                         {canManage && (
                           <Button size="sm" variant="outline" onClick={() => toggleLessonPublish(v)}>
                             {v.published ? 'Unpublish' : 'Publish'}
@@ -344,7 +607,7 @@ export default function CoursesPage() {
                     {expandedLessonId === v.id && (
                       <>
                         {v.videoUrl && <a href={v.videoUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, marginTop: 6, display: 'inline-block' }}>Watch video ↗</a>}
-                        <ResourcesPanel lessonId={v.id} canManage={canManage} toast={toast} />
+                        <ResourcesPanel lessonId={v.id} canManage={canManage} toast={toast} onCountChange={setMaterialCount} />
                       </>
                     )}
                   </Reveal>
