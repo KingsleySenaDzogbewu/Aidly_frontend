@@ -23,15 +23,20 @@ export default function InstructorOverview({ user, roleLabel }) {
         CourseApi.mine(),
         LessonQuestionApi.assigned(),
         user?.instructorProfileId ? LessonNoteApi.listByInstructor(user.instructorProfileId) : Promise.resolve([]),
+        // Unclaimed "Any instructor" questions aren't in /assigned - same merge as the Questions tab.
+        LessonQuestionApi.pending(),
       ]);
       if (cancelled) return;
-      const [bookings, courses, questions, notes] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
-      const questionList = questions?.content || questions || [];
-      const noteList = notes?.content || notes || [];
+      const [bookings, courses, assigned, notes, pending] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+      const rows = (page) => page?.content || page || [];
+      const questionsById = new Map();
+      [...rows(assigned), ...rows(pending)].forEach((q) => questionsById.set(q.id, q));
+      const noteList = rows(notes);
       setStats({
-        upcoming: (bookings || []).length,
+        // Still to come - not cancelled or already marked complete.
+        upcoming: (bookings || []).filter((b) => b.status === 'PENDING' || b.status === 'CONFIRMED').length,
         courses: (courses || []).length,
-        assigned: questionList.filter((q) => q.status !== 'ANSWERED' && q.status !== 'CLOSED').length,
+        assigned: [...questionsById.values()].filter((q) => q.status !== 'ANSWERED' && q.status !== 'CLOSED').length,
         notes: noteList.length,
       });
       setLoading(false);
@@ -44,7 +49,7 @@ export default function InstructorOverview({ user, roleLabel }) {
       <div className="respo-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         <StatCard label="Upcoming lessons" value={stats.upcoming} icon={Icons.IconCalendar} loading={loading} onClick={() => navigate('/bookings')} color="var(--hue-green)" index={0} />
         <StatCard label="My courses" value={stats.courses} icon={Icons.IconBook} loading={loading} onClick={() => navigate('/courses')} color="var(--hue-violet)" index={1} />
-        <StatCard label="Assigned questions" value={stats.assigned} icon={Icons.IconNotes} loading={loading} onClick={() => navigate('/notes')} color="var(--hue-amber)" index={2} />
+        <StatCard label="Questions to answer" value={stats.assigned} icon={Icons.IconNotes} loading={loading} onClick={() => navigate('/notes?tab=questions')} color="var(--hue-amber)" index={2} />
         <StatCard label="Lesson notes logged" value={stats.notes} icon={Icons.IconFile} loading={loading} onClick={() => navigate('/notes')} color="var(--hue-teal)" index={3} />
       </div>
 

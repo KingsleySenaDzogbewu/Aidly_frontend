@@ -35,7 +35,8 @@ export default function StudentOverview({ user, roleLabel }) {
       if (cancelled) return;
       const [bookings, questions, courses, wf, game] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
       const now = Date.now();
-      const upcoming = (bookings || []).filter((b) => b.scheduledAt && new Date(b.scheduledAt).getTime() > now && b.status !== 'CANCELLED').length;
+      // Only lessons still to come - a cancelled or already-completed booking isn't "upcoming".
+      const upcoming = (bookings || []).filter((b) => b.scheduledAt && new Date(b.scheduledAt).getTime() > now && (b.status === 'PENDING' || b.status === 'CONFIRMED')).length;
       const questionList = questions?.content || questions || [];
       setStats({
         upcoming,
