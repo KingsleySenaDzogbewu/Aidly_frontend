@@ -5,7 +5,8 @@ import { useAuth } from '../auth/AuthContext';
 import { NotificationApi, StudentApi, InstructorApi } from '../api/endpoints';
 import { Button, Card, Field, Input, Select, Textarea } from '../components/ui';
 
-const CHANNELS = ['IN_APP', 'EMAIL', 'SMS', 'PUSH'];
+// PUSH isn't wired to a provider on the backend yet and always fails - not offered.
+const CHANNELS = ['IN_APP', 'EMAIL', 'SMS'];
 const emptyForm = { userId: '', subject: '', body: '', channel: 'IN_APP', recipientAddress: '' };
 
 // Backend: POST /notifications/send, hasAnyRole('ADMIN','INSTRUCTOR'), takes a

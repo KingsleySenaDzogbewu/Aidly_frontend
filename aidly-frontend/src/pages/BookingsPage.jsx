@@ -9,6 +9,16 @@ const BOOKING_TYPES = ['ROAD_LESSON', 'THEORY_SESSION', 'DRIVING_ASSESSMENT', 'P
 
 const emptyForm = { studentId: '', instructorId: '', vehicleId: '', scheduledAt: '', durationMinutes: 60, bookingType: 'ROAD_LESSON', notes: '' };
 
+// A confirmed lesson whose time has passed but hasn't been marked complete yet.
+function needsCompleting(b) {
+  const end = b.endAt || b.scheduledAt;
+  return b.status === 'CONFIRMED' && !!end && new Date(end).getTime() < Date.now();
+}
+
+function NeedsCompletingTag() {
+  return <Badge variant="warning">Needs completing</Badge>;
+}
+
 export default function BookingsPage() {
   const { user, isAdmin, isInstructor, isStudent } = useAuth();
   const toast = useToast();
@@ -36,8 +46,10 @@ export default function BookingsPage() {
   const loadForInstructor = async (id) => {
     if (!id) return;
     setLoading(true);
+    // Include the last 30 days too - a lesson can only be marked complete
+    // after it happens, so it must still be listed once its start time passes.
     const now = new Date();
-    const from = now.toISOString().slice(0, 19);
+    const from = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 19);
     const to = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 19);
     try { setBookings(await BookingApi.listByInstructor(id, from, to) || []); }
     catch (err) { toast.error(err.message); }
@@ -177,9 +189,11 @@ export default function BookingsPage() {
                     <div style={{ fontSize: 13, fontWeight: 600, marginTop: 3 }}>{b.studentName || `Student #${b.studentId}`}</div>
                     <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>{b.bookingType?.replace('_', ' ')} · {b.status}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>Booking #{b.id}</div>
+                    {canManage && needsCompleting(b) && <div style={{ marginTop: 6 }}><NeedsCompletingTag /></div>}
                     {canManage && (
                       <div style={{ display: 'flex', gap: 5, marginTop: 8 }}>
                         <button className="btn btn-outline btn-sm" style={{ flex: 1, padding: '7px 5px', fontSize: 11 }} onClick={() => doAction(b.id, 'confirm')}>Confirm</button>
+                        <button className="btn btn-outline btn-sm" style={{ flex: 1, padding: '7px 5px', fontSize: 11 }} onClick={() => doAction(b.id, 'complete')}>Complete</button>
                         <button className="btn btn-outline btn-sm" style={{ flex: 1, padding: '7px 5px', fontSize: 11, color: 'var(--danger)' }} onClick={() => doAction(b.id, 'cancel')}>Cancel</button>
                       </div>
                     )}
@@ -199,6 +213,7 @@ export default function BookingsPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <div style={{ fontSize: 14.5, fontWeight: 700 }}>{b.studentName || `Student #${b.studentId}`} · {b.instructorName || `Instructor #${b.instructorId}`}</div>
                       <Badge status={b.status}>{b.status}</Badge>
+                      {canManage && needsCompleting(b) && <NeedsCompletingTag />}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
                       {fmtDateTime(b.scheduledAt)} · {b.durationMinutes} min · {b.bookingType?.replace('_', ' ')}

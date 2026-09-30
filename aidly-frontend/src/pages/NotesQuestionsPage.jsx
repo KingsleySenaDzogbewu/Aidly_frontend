@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
-import { LessonNoteApi, LessonQuestionApi } from '../api/endpoints';
+import { LessonNoteApi, LessonQuestionApi, ConversationApi } from '../api/endpoints';
 import { Button, Card, Badge, Field, Input, Textarea, Select, Tabs, SkeletonList, EmptyState, Icons, Reveal, StudentPicker } from '../components/ui';
 import { fmtDateTime } from '../utils/format';
 
@@ -138,6 +138,14 @@ export default function NotesQuestionsPage() {
   const [questionForm, setQuestionForm] = useState(emptyQuestion);
   const [savingQuestion, setSavingQuestion] = useState(false);
   const [responseTexts, setResponseTexts] = useState({});
+  const [instructorOptions, setInstructorOptions] = useState([]);
+
+  // Students pick who to ask by name; if the list can't load they can still
+  // send to "Any instructor" (every instructor at the school is notified).
+  useEffect(() => {
+    if (!isStudent || !showQuestionForm) return;
+    ConversationApi.contacts().then((list) => setInstructorOptions(list || [])).catch(() => setInstructorOptions([]));
+  }, [isStudent, showQuestionForm]);
 
   const loadQuestions = async () => {
     if (!user) return;
@@ -283,8 +291,11 @@ export default function NotesQuestionsPage() {
                 <Field label="Your question" required hint="10–3000 characters" style={{ marginBottom: 14 }}>
                   <Textarea rows={3} required minLength={10} value={questionForm.questionBody} onChange={(e) => setQuestionForm((f) => ({ ...f, questionBody: e.target.value }))} />
                 </Field>
-                <Field label="Instructor profile ID (optional)" style={{ marginBottom: 14 }}>
-                  <Input value={questionForm.assignedInstructorId} onChange={(e) => setQuestionForm((f) => ({ ...f, assignedInstructorId: e.target.value }))} />
+                <Field label="Ask" hint="“Any instructor” sends it to every instructor at your school" style={{ marginBottom: 14 }}>
+                  <Select value={questionForm.assignedInstructorId} onChange={(e) => setQuestionForm((f) => ({ ...f, assignedInstructorId: e.target.value }))}>
+                    <option value="">Any instructor</option>
+                    {instructorOptions.map((i) => <option key={i.profileId} value={i.profileId}>{i.firstName} {i.lastName}</option>)}
+                  </Select>
                 </Field>
                 <Button type="submit" loading={savingQuestion}>Submit question</Button>
               </form>

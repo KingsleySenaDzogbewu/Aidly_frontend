@@ -176,8 +176,8 @@ function LicenseProgressTab() {
 
   const [lookupStudentId, setLookupStudentId] = useState('');
   const [workflow, setWorkflow] = useState(null);
+  const [notStarted, setNotStarted] = useState(false); // loaded, but no workflow exists for this student yet
   const [theoryInput, setTheoryInput] = useState('');
-  const [targetStage, setTargetStage] = useState('THEORY_COMPLETED');
   const [busy, setBusy] = useState(false);
   const stepperRef = useRef(null);
 
@@ -185,22 +185,32 @@ function LicenseProgressTab() {
 
   const load = async (id) => {
     if (!id) return;
-    try { setWorkflow(await LicenseWorkflowApi.get(id)); }
-    catch (err) { toast.error(err.message); }
+    try {
+      setWorkflow(await LicenseWorkflowApi.get(id));
+      setNotStarted(false);
+    } catch (err) {
+      // 404 just means the admin hasn't started this student's workflow yet -
+      // an expected state, not an error worth a red toast.
+      setWorkflow(null);
+      if (err.status === 404) setNotStarted(true);
+      else { setNotStarted(false); toast.error(err.message); }
+    }
   };
 
   useEffect(() => { if (isStudent) load(user?.studentProfileId); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user]);
 
   const initWorkflow = async () => {
     setBusy(true);
-    try { await LicenseWorkflowApi.initialize(lookupStudentId); toast.success('Workflow initialized'); load(lookupStudentId); }
+    try { await LicenseWorkflowApi.initialize(lookupStudentId); toast.success('License progress started'); load(lookupStudentId); }
     catch (err) { toast.error(err.message); }
     finally { setBusy(false); }
   };
 
+  // Normally automatic (a passed linked quiz), so it's only offered as an
+  // admin override at the one stage where it applies.
   const markQuizPassed = async () => {
     setBusy(true);
-    try { await LicenseWorkflowApi.markQuizPassed(lookupStudentId); toast.success('Marked quiz passed'); load(lookupStudentId); }
+    try { await LicenseWorkflowApi.markQuizPassed(activeStudentId); toast.success('Marked quiz passed'); load(activeStudentId); }
     catch (err) { toast.error(err.message); }
     finally { setBusy(false); }
   };
@@ -215,7 +225,7 @@ function LicenseProgressTab() {
     finally { setBusy(false); }
   };
 
-  const advance = async () => {
+  const advance = async (targetStage) => {
     setBusy(true);
     try {
       await LicenseWorkflowApi.advance(activeStudentId, targetStage, null);
@@ -226,6 +236,8 @@ function LicenseProgressTab() {
   };
 
   const curIdx = workflow ? LICENSE_STAGES.indexOf(workflow.currentStage) : -1;
+  // The backend only accepts the next stage in sequence, so only that is offered.
+  const nextStage = curIdx >= 0 ? LICENSE_STAGES[curIdx + 1] : undefined;
 
   // On narrow screens the stepper scrolls horizontally — bring the
   // student's current stage into view instead of leaving it off-screen.
@@ -241,17 +253,24 @@ function LicenseProgressTab() {
         <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
           <Input placeholder="Student profile ID" value={lookupStudentId} onChange={(e) => setLookupStudentId(e.target.value)} style={{ width: 170 }} />
           <Button variant="outline" onClick={() => load(lookupStudentId)}>Load</Button>
-          {isAdmin && (
-            <>
-              <Button variant="soft" onClick={initWorkflow} loading={busy}>Initialize workflow</Button>
-              <Button variant="soft" onClick={markQuizPassed} loading={busy}>Mark quiz passed</Button>
-            </>
-          )}
         </div>
       )}
 
-      {!workflow ? (
-        <EmptyState icon={<Icons.IconShield size={22} />} title="No license workflow loaded yet" />
+      {!workflow && notStarted ? (
+        <EmptyState icon={<Icons.IconShield size={22} />} title="License progress not started yet">
+          {isStudent
+            ? 'Your license progress hasn’t been started yet — your school admin will set it up.'
+            : 'This student’s license progress hasn’t been started yet.'}
+          {isAdmin && (
+            <div style={{ marginTop: 12 }}>
+              <Button size="sm" onClick={initWorkflow} loading={busy}>Start license progress</Button>
+            </div>
+          )}
+        </EmptyState>
+      ) : !workflow ? (
+        <EmptyState icon={<Icons.IconShield size={22} />} title="No license progress loaded yet">
+          {!isStudent && 'Enter a student profile ID above and click Load.'}
+        </EmptyState>
       ) : (
         <Card className="fade-in-up" style={{ maxWidth: 720 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap' }}>
@@ -316,10 +335,20 @@ function LicenseProgressTab() {
 
           {(isAdmin || isInstructor) && (
             <div style={{ display: 'flex', gap: 8, marginTop: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-              <Select value={targetStage} onChange={(e) => setTargetStage(e.target.value)}>
-                {LICENSE_STAGES.filter((s) => s !== 'THEORY_LEARNING').map((s) => <option key={s} value={s}>{humanize(s)}</option>)}
-              </Select>
-              <Button onClick={advance} loading={busy}>Advance stage</Button>
+              {!nextStage ? (
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--success)' }}>License approved 🎉</div>
+              ) : nextStage === 'QUIZ_PASSED' ? (
+                <>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                    Moves on automatically when the student passes a linked quiz.
+                  </div>
+                  {isAdmin && (
+                    <Button size="sm" variant="outline" onClick={markQuizPassed} loading={busy}>Mark quiz passed (manual override)</Button>
+                  )}
+                </>
+              ) : (
+                <Button onClick={() => advance(nextStage)} loading={busy}>Advance to: {humanize(nextStage)}</Button>
+              )}
             </div>
           )}
         </Card>

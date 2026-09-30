@@ -174,6 +174,11 @@ export const LessonQuestionApi = {
   historyPaginated: (id, params) => http.get(`/lesson-questions/${id}/history/paginated`, { params }),
 };
 
+export const ConversationApi = {
+  // Student caller: their school's ACTIVE instructors; instructor caller: their school's students.
+  contacts: () => http.get('/conversations/contacts'),
+};
+
 export const LiveSessionApi = {
   create: (payload) => http.post('/live-sessions', payload),
   get: (id) => http.get(`/live-sessions/${id}`),

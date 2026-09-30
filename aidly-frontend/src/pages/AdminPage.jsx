@@ -26,7 +26,9 @@ function RegisterTab({ toast }) {
         yearsExperience: form.yearsExperience ? Number(form.yearsExperience) : null,
       });
       toast.success('User created');
-      setForm(emptyUser);
+      // Keep the locked school ID - the field is disabled, so wiping it would
+      // send schoolId 0 on the next account.
+      setForm({ ...emptyUser, schoolId: lockedSchoolId });
     } catch (err) { toast.error(err.message); }
     finally { setBusy(false); }
   };
