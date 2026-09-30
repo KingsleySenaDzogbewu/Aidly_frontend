@@ -34,8 +34,10 @@ export default function NotificationsPage() {
             return (
               <Reveal key={n.id} delay={Math.min(i, 8) * 40}>
                 <Card tight hover style={{ background: unread ? 'var(--accent-soft-bg)' : 'var(--surface)' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-                    <div style={{ minWidth: 0 }}>
+                  {/* The text keeps at least ~240px; on narrow screens the buttons wrap
+                      below it instead of squeezing the title to one word per line. */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px 16px', flexWrap: 'wrap' }}>
+                    <div style={{ minWidth: 0, flex: '1 1 240px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {unread && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />}
                         <div style={{ fontSize: 14.5, fontWeight: 700 }}>{n.subject}</div>
@@ -43,7 +45,7 @@ export default function NotificationsPage() {
                       <div style={{ fontSize: 13.5, color: 'var(--text)', marginTop: 6 }}>{n.body}</div>
                       <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>{n.channel} · {fmtDateTime(n.sentAt)}</div>
                     </div>
-                    <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 8, flex: '0 0 auto', flexWrap: 'wrap' }}>
                       {isQuestionNotification(n) && (
                         <Button size="sm" onClick={() => viewQuestion(n)}>View question</Button>
                       )}

@@ -20,6 +20,10 @@ export function initSentry() {
       Sentry.feedbackIntegration({
         colorScheme: 'system',
         showBranding: false,
+        // Not auto-injected: the floating button covered page content on
+        // phones. FloatingFeedbackButton adds it on desktop only, and the
+        // mobile sidebar has its own "Report a bug" item instead.
+        autoInject: false,
       }),
     ],
     tracesSampleRate: 0.2,

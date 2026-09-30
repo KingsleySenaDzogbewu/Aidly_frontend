@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import * as Sentry from '@sentry/react';
 import { useAuth } from '../auth/AuthContext';
 import { useNotifications } from '../features/notifications/NotificationsContext';
 import { Icons } from '../components/ui';
@@ -32,6 +34,16 @@ export default function Sidebar({ mobile, open, onNavigate, onClose }) {
   const { unreadCount } = useNotifications();
 
   const classes = ['sidebar', mobile ? 'mobile' : '', mobile && open ? 'open' : ''].filter(Boolean).join(' ');
+
+  // On phones the floating "Report a Bug" button is hidden (it covered page
+  // content), so the menu gets its own item wired to the same Sentry form.
+  const reportBugRef = useRef(null);
+  const [canReportBug] = useState(() => !!Sentry.getFeedback());
+  useEffect(() => {
+    const feedback = Sentry.getFeedback();
+    if (!mobile || !feedback || !reportBugRef.current) return undefined;
+    return feedback.attachTo(reportBugRef.current);
+  }, [mobile]);
 
   return (
     <nav className={classes} aria-label="Primary" aria-hidden={mobile && !open}>
@@ -100,6 +112,13 @@ export default function Sidebar({ mobile, open, onNavigate, onClose }) {
               </NavLink>
             ))}
           </>
+        )}
+
+        {mobile && canReportBug && (
+          <button type="button" ref={reportBugRef} className="nav-item" onClick={onNavigate}>
+            <Icons.IconWarn size={16} />
+            Report a bug
+          </button>
         )}
       </div>
 

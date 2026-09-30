@@ -4,6 +4,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute, RequireRole } from './auth/ProtectedRoute';
 import { NotificationsProvider } from './features/notifications/NotificationsContext';
 import { ToastProvider } from './components/ui';
+import FloatingFeedbackButton from './components/FloatingFeedbackButton';
 import AppShell from './layout/AppShell';
 
 import LoginPage from './pages/LoginPage';
@@ -37,6 +38,7 @@ function AuthedApp() {
 export default function App() {
   return (
     <ToastProvider>
+      <FloatingFeedbackButton />
       <BrowserRouter>
         <AuthProvider>
           <Routes>
