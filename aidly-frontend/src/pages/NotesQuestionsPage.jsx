@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { LessonNoteApi, LessonQuestionApi, ConversationApi } from '../api/endpoints';
@@ -87,7 +88,12 @@ function NoteAttachments({ noteId, canManage, toast }) {
 export default function NotesQuestionsPage() {
   const { user, isAdmin, isInstructor, isStudent } = useAuth();
   const toast = useToast();
-  const [tab, setTab] = useState('notes');
+  // ?tab=questions (e.g. from a "View question" notification) opens that tab directly.
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get('tab') === 'questions' ? 'questions' : 'notes');
+  useEffect(() => {
+    if (searchParams.get('tab') === 'questions') setTab('questions');
+  }, [searchParams]);
 
   // Lesson notes
   const [notes, setNotes] = useState([]);
@@ -151,15 +157,26 @@ export default function NotesQuestionsPage() {
     if (!user) return;
     setQuestionsLoading(true);
     try {
+      const rows = (page) => page?.content || page || [];
       let list;
-      if (isStudent) list = await LessonQuestionApi.myQuestions();
-      else if (isInstructor) list = await LessonQuestionApi.assigned();
-      else list = await LessonQuestionApi.byStatus('PENDING');
-      setQuestions(list?.content || list || []);
+      if (isStudent) list = rows(await LessonQuestionApi.myQuestions());
+      else if (isInstructor) {
+        // /assigned only has questions addressed to this instructor; questions
+        // sent to "Any instructor" live in /pending (unclaimed ones for the
+        // whole school) - show both, without duplicates, newest first.
+        const [assigned, pending] = await Promise.all([LessonQuestionApi.assigned(), LessonQuestionApi.pending()]);
+        const byId = new Map();
+        [...rows(assigned), ...rows(pending)].forEach((q) => byId.set(q.id, q));
+        list = [...byId.values()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      } else list = rows(await LessonQuestionApi.byStatus('PENDING'));
+      setQuestions(list);
     } catch (err) { toast.error(err.message); }
     finally { setQuestionsLoading(false); }
   };
   useEffect(() => { loadQuestions(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user]);
+
+  // For instructors: questions still waiting on an answer, shown on the tab label.
+  const waitingCount = isInstructor ? questions.filter((q) => q.status === 'PENDING' || q.status === 'IN_PROGRESS').length : 0;
 
   const submitQuestion = async (e) => {
     e.preventDefault();
@@ -204,7 +221,7 @@ export default function NotesQuestionsPage() {
       <Tabs
         value={tab}
         onChange={setTab}
-        options={[{ value: 'notes', label: 'Lesson notes' }, { value: 'questions', label: 'Questions' }]}
+        options={[{ value: 'notes', label: 'Lesson notes' }, { value: 'questions', label: waitingCount > 0 ? `Questions (${waitingCount})` : 'Questions' }]}
         className="fade-in"
       />
       <div style={{ height: 20 }} />
@@ -311,7 +328,10 @@ export default function NotesQuestionsPage() {
                   <Card tight hover>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                       <div style={{ fontSize: 14, fontWeight: 700 }}>{q.subject}</div>
-                      <Badge status={q.status}>{q.status}</Badge>
+                      <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {!isStudent && !q.instructorId && <Badge variant="info">Unassigned — any instructor can answer</Badge>}
+                        <Badge status={q.status}>{q.status.replace('_', ' ')}</Badge>
+                      </span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 8px' }}>From {q.studentName} · {fmtDateTime(q.createdAt)}</div>
                     <div style={{ fontSize: 13.5 }}>{q.questionBody}</div>
@@ -332,6 +352,15 @@ export default function NotesQuestionsPage() {
                             {QUESTION_STATUSES.map((st) => <option key={st} value={st}>{st.replace('_', ' ')}</option>)}
                           </Select>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Only instructors can reply; admins can still move a question's status. */}
+                    {isAdmin && !isInstructor && (
+                      <div style={{ marginTop: 10 }}>
+                        <Select size="sm" value={q.status} onChange={(e) => setStatus(q.id, e.target.value)}>
+                          {QUESTION_STATUSES.map((st) => <option key={st} value={st}>{st.replace('_', ' ')}</option>)}
+                        </Select>
                       </div>
                     )}
                   </Card>

@@ -1,9 +1,20 @@
+import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../features/notifications/NotificationsContext';
 import { Button, Card, SkeletonList, EmptyState, Icons, Reveal } from '../components/ui';
 import { fmtDateTime } from '../utils/format';
 
+// "New question from …" (to instructors) / answered-question notices (to
+// students) - the question itself lives on Notes & questions, so link there.
+const isQuestionNotification = (n) => /question/i.test(n.subject || '');
+
 export default function NotificationsPage() {
   const { items, loading, markRead } = useNotifications();
+  const navigate = useNavigate();
+
+  const viewQuestion = (n) => {
+    if (!n.readAt) markRead(n.id).catch(() => {});
+    navigate('/notes?tab=questions');
+  };
 
   return (
     <div className="fade-in">
@@ -32,11 +43,16 @@ export default function NotificationsPage() {
                       <div style={{ fontSize: 13.5, color: 'var(--text)', marginTop: 6 }}>{n.body}</div>
                       <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>{n.channel} · {fmtDateTime(n.sentAt)}</div>
                     </div>
-                    {unread && (
-                      <Button size="sm" variant="outline" onClick={() => markRead(n.id)} style={{ flexShrink: 0 }}>
-                        Mark read
-                      </Button>
-                    )}
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      {isQuestionNotification(n) && (
+                        <Button size="sm" onClick={() => viewQuestion(n)}>View question</Button>
+                      )}
+                      {unread && (
+                        <Button size="sm" variant="outline" onClick={() => markRead(n.id)}>
+                          Mark read
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </Card>
               </Reveal>
