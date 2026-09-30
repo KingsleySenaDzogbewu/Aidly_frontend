@@ -89,7 +89,7 @@ export default function ProfilePage() {
               <div className="form-grid respo-two-col">
                 <Field label="First name" required><Input required value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} /></Field>
                 <Field label="Last name" required><Input required value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} /></Field>
-                <Field label="Phone"><Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></Field>
+                <Field label="Phone" hint="Include the country code, e.g. +233 24 123 4567"><Input type="tel" maxLength={20} placeholder="+233 24 123 4567" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></Field>
                 {isInstructor && (
                   <>
                     <Field label="Specialization"><Input value={form.specialization} onChange={(e) => setForm((f) => ({ ...f, specialization: e.target.value }))} /></Field>

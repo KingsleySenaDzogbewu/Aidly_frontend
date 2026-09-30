@@ -51,7 +51,7 @@ function RegisterTab({ toast }) {
         </Field>
         <Field label="First name" required><Input required value={form.firstName} onChange={set('firstName')} /></Field>
         <Field label="Last name" required><Input required value={form.lastName} onChange={set('lastName')} /></Field>
-        <Field label="Phone"><Input value={form.phone} onChange={set('phone')} /></Field>
+        <Field label="Phone" hint="Include the country code so login codes can go by WhatsApp"><Input type="tel" maxLength={20} placeholder="+233 24 123 4567" value={form.phone} onChange={set('phone')} /></Field>
         <Field label="Date of birth"><Input type="date" value={form.dateOfBirth} onChange={set('dateOfBirth')} /></Field>
         <Field label="Specialization" hint="Instructor only"><Input value={form.specialization} onChange={set('specialization')} disabled={!isInstructorRole} /></Field>
         <Field label="License number" required={isInstructorRole} hint="Required for instructors"><Input value={form.licenseNumber} onChange={set('licenseNumber')} /></Field>

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { AuthApi } from '../api/endpoints';
 import { Button, Field, Input, Icons } from '../components/ui';
 import RoadMotif from '../components/motion/RoadMotif';
+import VerifyAccount from './VerifyAccount';
 import loginHero from '../assets/images/login-hero.jpg';
 import loginBg from '../assets/images/login-bg.jpg';
 import './login.css';
@@ -24,6 +25,17 @@ export default function LoginPage() {
   const [forgotBusy, setForgotBusy] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
 
+  // Set when a new account's first login needs a one-time code instead of
+  // returning tokens. Memory only - never persisted.
+  const [challenge, setChallenge] = useState(null);
+
+  // Stable so VerifyAccount's expiry timer isn't restarted on every render.
+  const backToSignIn = useCallback((message) => {
+    setChallenge(null);
+    setPassword('');
+    setError(message || '');
+  }, []);
+
   if (!initializing && isAuthenticated) {
     return <Navigate to={location.state?.from?.pathname || '/'} replace />;
   }
@@ -33,7 +45,11 @@ export default function LoginPage() {
     setBusy(true);
     setError('');
     try {
-      await login(email, password);
+      const result = await login(email, password);
+      if (result?.verificationRequired) {
+        setChallenge(result.verification);
+        return;
+      }
       navigate(location.state?.from?.pathname || '/', { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed');
@@ -73,6 +89,10 @@ export default function LoginPage() {
         </div>
 
         <div className="login-form-pane respo-login-pane">
+          {challenge ? (
+            <VerifyAccount challenge={challenge} onBack={backToSignIn} />
+          ) : (
+          <>
           <div className="login-form-eyebrow">Sign in</div>
           <h2 className="login-form-title">Welcome back</h2>
 
@@ -161,6 +181,8 @@ export default function LoginPage() {
             Accounts are created by your school&rsquo;s admin or instructor — there&rsquo;s no
             public sign-up.
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>

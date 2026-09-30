@@ -13,6 +13,10 @@ export const AuthApi = {
   adminRegister: (payload) => http.post('/auth/admin/register', payload),
   refresh: (refreshToken) => http.post('/auth/refresh-token', { refreshToken }, { noAuth: true }),
   logout: (refreshToken) => http.post('/auth/logout', { refreshToken }),
+  // One-time account verification at a new account's first login. Public:
+  // the challengeId from the login response is the credential.
+  sendVerification: (challengeId, channel) => http.post('/auth/verification/send', { challengeId, channel }, { noAuth: true }),
+  confirmVerification: (challengeId, code) => http.post('/auth/verification/confirm', { challengeId, code }, { noAuth: true }),
   forgotPassword: (email) => http.post('/auth/forgot-password', { email }, { noAuth: true }),
   resetPassword: (token, newPassword) => http.post('/auth/reset-password', { token, newPassword }, { noAuth: true }),
   deleteMe: () => http.delete('/auth/me'),

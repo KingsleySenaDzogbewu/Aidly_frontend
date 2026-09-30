@@ -121,6 +121,10 @@ http.interceptors.response.use(
       console.error(`[api] ${error.response.status} on ${original?.method?.toUpperCase()} ${original?.url}: ${message}`);
     }
 
-    return Promise.reject(new ApiError(message, error.response.status, body));
+    const apiError = new ApiError(message, error.response.status, body);
+    // 429s (e.g. resending a verification code too soon) say how many seconds to wait.
+    const retryAfter = Number(error.response.headers?.['retry-after']);
+    if (Number.isFinite(retryAfter) && retryAfter > 0) apiError.retryAfter = retryAfter;
+    return Promise.reject(apiError);
   },
 );

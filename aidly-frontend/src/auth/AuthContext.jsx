@@ -67,12 +67,26 @@ export function AuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const login = async (email, password) => {
-    const data = await AuthApi.login(email, password);
+  const finishLogin = async (data) => {
     setSession({ accessToken: data.accessToken, refreshToken: data.refreshToken });
     const me = await withProfileName(await AuthApi.me());
     setSession({ user: me });
     return me;
+  };
+
+  // A new account's first login answers with a verification challenge
+  // instead of tokens - hand that back to the login page (it's kept in
+  // memory only, never stored) rather than treating it as signed in.
+  const login = async (email, password) => {
+    const data = await AuthApi.login(email, password);
+    if (data?.verificationRequired) return { verificationRequired: true, verification: data.verification };
+    return finishLogin(data);
+  };
+
+  // The confirm response is exactly a normal login response.
+  const completeVerification = async (challengeId, code) => {
+    const data = await AuthApi.confirmVerification(challengeId, code);
+    return finishLogin(data);
   };
 
   const logout = async () => {
@@ -103,6 +117,7 @@ export function AuthProvider({ children }) {
       // admins directly - a regular admin is scoped to their own school.
       isBootstrapAdmin: !!user?.bootstrapAdmin,
       login,
+      completeVerification,
       logout,
       refreshMe,
     };

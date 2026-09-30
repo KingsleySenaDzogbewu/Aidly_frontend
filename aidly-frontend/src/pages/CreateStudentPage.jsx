@@ -53,7 +53,7 @@ export default function CreateStudentPage() {
           </Field>
           <Field label="First name" required><Input required value={form.firstName} onChange={set('firstName')} /></Field>
           <Field label="Last name" required><Input required value={form.lastName} onChange={set('lastName')} /></Field>
-          <Field label="Phone"><Input value={form.phone} onChange={set('phone')} /></Field>
+          <Field label="Phone" hint="Include the country code so login codes can go by WhatsApp"><Input type="tel" maxLength={20} placeholder="+233 24 123 4567" value={form.phone} onChange={set('phone')} /></Field>
           <Field label="Date of birth"><Input type="date" value={form.dateOfBirth} onChange={set('dateOfBirth')} /></Field>
           <Button type="submit" className="span-2" loading={busy}>Create student account</Button>
         </form>
