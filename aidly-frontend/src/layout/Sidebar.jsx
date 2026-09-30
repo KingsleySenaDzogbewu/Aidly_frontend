@@ -104,7 +104,10 @@ export default function Sidebar({ mobile, open, onNavigate, onClose }) {
       </div>
 
       <div className="user-card">
-        <div className="user-card-email">{user?.email}</div>
+        {user?.firstName && (
+          <div className="user-card-name">{user.firstName} {user.lastName}</div>
+        )}
+        <div className={user?.firstName ? 'user-card-email user-card-email-sub' : 'user-card-email'}>{user?.email}</div>
         <div className="user-card-role">
           {isAdmin && isBootstrapAdmin ? 'Admin of admins (all schools)' : isAdmin ? 'Admin (your school)' : roles.join(', ') || '—'}
         </div>

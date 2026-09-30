@@ -1,9 +1,24 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { AuthApi } from '../api/endpoints';
+import { AuthApi, InstructorApi, StudentApi } from '../api/endpoints';
 import { useToast } from '../components/ui';
 import { getAuthState, setSession, clearSession, subscribeAuth } from './tokenStore';
 
 const AuthContext = createContext(null);
+
+// /auth/me has no name, so students and instructors get their first/last
+// name from their own profile (used for the greeting and sidebar). Admins
+// have no profile or name. Best effort - a failure just means no name shown.
+async function withProfileName(me) {
+  try {
+    const roles = me?.roles || [];
+    const profile = roles.includes('INSTRUCTOR') ? await InstructorApi.me()
+      : roles.includes('STUDENT') ? await StudentApi.me()
+        : null;
+    return profile ? { ...me, firstName: profile.firstName, lastName: profile.lastName } : me;
+  } catch {
+    return me;
+  }
+}
 
 export function AuthProvider({ children }) {
   const [authState, setAuthState] = useState(getAuthState());
@@ -40,7 +55,7 @@ export function AuthProvider({ children }) {
       const { accessToken } = getAuthState();
       if (accessToken) {
         try {
-          const me = await AuthApi.me();
+          const me = await withProfileName(await AuthApi.me());
           if (!cancelled) setSession({ user: me });
         } catch {
           if (!cancelled) clearSession();
@@ -55,7 +70,7 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const data = await AuthApi.login(email, password);
     setSession({ accessToken: data.accessToken, refreshToken: data.refreshToken });
-    const me = await AuthApi.me();
+    const me = await withProfileName(await AuthApi.me());
     setSession({ user: me });
     return me;
   };
@@ -67,7 +82,7 @@ export function AuthProvider({ children }) {
   };
 
   const refreshMe = async () => {
-    const me = await AuthApi.me();
+    const me = await withProfileName(await AuthApi.me());
     setSession({ user: me });
     return me;
   };

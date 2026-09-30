@@ -18,7 +18,8 @@ export default function OverviewPage() {
 
   return (
     <div className="fade-in">
-      <h1 className="page-title">{greeting}{user?.email ? `, ${user.email.split('@')[0]}` : ''}</h1>
+      {/* First name for students/instructors; admins have no name, so just the greeting. */}
+      <h1 className="page-title">{greeting}{user?.firstName ? `, ${user.firstName}` : ''}</h1>
       <p className="page-subtitle" style={{ marginBottom: 28 }}>
         {isAdmin
           ? 'Here’s what needs your attention across the school.'
