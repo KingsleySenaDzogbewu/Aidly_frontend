@@ -14,6 +14,20 @@ export function Field({ label, hint, error, required, children, className = '', 
   );
 }
 
+// Shows a text box's length rule up front, with a live count, so people see
+// "At least 10 characters (4/10)" before the backend rejects a short answer.
+export function LengthHint({ value, min, max }) {
+  const len = (value || '').length;
+  if (min && len < min) {
+    return (
+      <span style={{ color: len > 0 ? 'var(--warning)' : undefined }}>
+        At least {min} characters{len > 0 ? ` (${len}/${min})` : ''}
+      </span>
+    );
+  }
+  return <span style={{ fontVariantNumeric: 'tabular-nums' }}>{max ? `${len} / ${max} characters` : `${len} characters`}</span>;
+}
+
 export function Input({ className = '', size, ...rest }) {
   return <input className={`input ${size === 'sm' ? 'input-sm' : ''} ${className}`} {...rest} />;
 }

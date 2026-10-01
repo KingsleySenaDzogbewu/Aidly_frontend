@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { LessonNoteApi, LessonQuestionApi, ConversationApi } from '../api/endpoints';
-import { Button, Card, Badge, Field, Input, Textarea, Select, Tabs, SkeletonList, EmptyState, Icons, Reveal, StudentPicker } from '../components/ui';
+import { Button, Card, Badge, Field, Input, Textarea, Select, Tabs, SkeletonList, EmptyState, Icons, Reveal, StudentPicker, LengthHint } from '../components/ui';
 import { fmtDateTime } from '../utils/format';
 
 const QUESTION_STATUSES = ['PENDING', 'IN_PROGRESS', 'ANSWERED', 'CLOSED'];
@@ -243,17 +243,17 @@ export default function NotesQuestionsPage() {
                   <StudentPicker schoolId={user?.schoolId} required value={noteForm.studentId} onChange={(v) => setNoteForm((f) => ({ ...f, studentId: v }))} />
                   <Field label="Booking ID (optional)"><Input value={noteForm.bookingId} onChange={(e) => setNoteForm((f) => ({ ...f, bookingId: e.target.value }))} /></Field>
                 </div>
-                <Field label="Lesson summary" required hint="10–1000 characters" style={{ marginBottom: 14 }}>
-                  <Textarea rows={2} required minLength={10} value={noteForm.lessonSummary} onChange={(e) => setNoteForm((f) => ({ ...f, lessonSummary: e.target.value }))} />
+                <Field label="Lesson summary" required hint={<LengthHint value={noteForm.lessonSummary} min={10} max={1000} />} style={{ marginBottom: 14 }}>
+                  <Textarea rows={2} required minLength={10} maxLength={1000} value={noteForm.lessonSummary} onChange={(e) => setNoteForm((f) => ({ ...f, lessonSummary: e.target.value }))} />
                 </Field>
-                <Field label="Strengths" required hint="10–1500 characters" style={{ marginBottom: 14 }}>
-                  <Textarea rows={2} required minLength={10} value={noteForm.strengths} onChange={(e) => setNoteForm((f) => ({ ...f, strengths: e.target.value }))} />
+                <Field label="Strengths" required hint={<LengthHint value={noteForm.strengths} min={10} max={1500} />} style={{ marginBottom: 14 }}>
+                  <Textarea rows={2} required minLength={10} maxLength={1500} value={noteForm.strengths} onChange={(e) => setNoteForm((f) => ({ ...f, strengths: e.target.value }))} />
                 </Field>
-                <Field label="Weaknesses" required hint="10–1500 characters" style={{ marginBottom: 14 }}>
-                  <Textarea rows={2} required minLength={10} value={noteForm.weaknesses} onChange={(e) => setNoteForm((f) => ({ ...f, weaknesses: e.target.value }))} />
+                <Field label="Weaknesses" required hint={<LengthHint value={noteForm.weaknesses} min={10} max={1500} />} style={{ marginBottom: 14 }}>
+                  <Textarea rows={2} required minLength={10} maxLength={1500} value={noteForm.weaknesses} onChange={(e) => setNoteForm((f) => ({ ...f, weaknesses: e.target.value }))} />
                 </Field>
-                <Field label="Recommendations" required hint="10–1500 characters" style={{ marginBottom: 14 }}>
-                  <Textarea rows={2} required minLength={10} value={noteForm.recommendations} onChange={(e) => setNoteForm((f) => ({ ...f, recommendations: e.target.value }))} />
+                <Field label="Recommendations" required hint={<LengthHint value={noteForm.recommendations} min={10} max={1500} />} style={{ marginBottom: 14 }}>
+                  <Textarea rows={2} required minLength={10} maxLength={1500} value={noteForm.recommendations} onChange={(e) => setNoteForm((f) => ({ ...f, recommendations: e.target.value }))} />
                 </Field>
                 <Button type="submit" loading={savingNote}>Save note</Button>
               </form>
@@ -302,11 +302,11 @@ export default function NotesQuestionsPage() {
           {showQuestionForm && (
             <Card className="fade-in" style={{ marginBottom: 18 }}>
               <form onSubmit={submitQuestion}>
-                <Field label="Subject" required style={{ marginBottom: 14 }}>
-                  <Input required minLength={5} value={questionForm.subject} onChange={(e) => setQuestionForm((f) => ({ ...f, subject: e.target.value }))} />
+                <Field label="Subject" required hint={<LengthHint value={questionForm.subject} min={5} max={255} />} style={{ marginBottom: 14 }}>
+                  <Input required minLength={5} maxLength={255} value={questionForm.subject} onChange={(e) => setQuestionForm((f) => ({ ...f, subject: e.target.value }))} />
                 </Field>
-                <Field label="Your question" required hint="10–3000 characters" style={{ marginBottom: 14 }}>
-                  <Textarea rows={3} required minLength={10} value={questionForm.questionBody} onChange={(e) => setQuestionForm((f) => ({ ...f, questionBody: e.target.value }))} />
+                <Field label="Your question" required hint={<LengthHint value={questionForm.questionBody} min={10} max={3000} />} style={{ marginBottom: 14 }}>
+                  <Textarea rows={3} required minLength={10} maxLength={3000} value={questionForm.questionBody} onChange={(e) => setQuestionForm((f) => ({ ...f, questionBody: e.target.value }))} />
                 </Field>
                 <Field label="Ask" hint="“Any instructor” sends it to every instructor at your school" style={{ marginBottom: 14 }}>
                   <Select value={questionForm.assignedInstructorId} onChange={(e) => setQuestionForm((f) => ({ ...f, assignedInstructorId: e.target.value }))}>
@@ -345,9 +345,12 @@ export default function NotesQuestionsPage() {
 
                     {isInstructor && (
                       <div style={{ marginTop: 10 }}>
-                        <Textarea rows={2} placeholder="Write a response…" value={responseTexts[q.id] || ''} onChange={(e) => setResponseTexts((r) => ({ ...r, [q.id]: e.target.value }))} style={{ marginBottom: 8 }} />
+                        <Textarea rows={2} maxLength={3000} placeholder="Write a response…" value={responseTexts[q.id] || ''} onChange={(e) => setResponseTexts((r) => ({ ...r, [q.id]: e.target.value }))} />
+                        <div className="field-hint" style={{ margin: '4px 0 8px' }}>
+                          <LengthHint value={responseTexts[q.id]} min={10} max={3000} />
+                        </div>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          <Button size="sm" onClick={() => respond(q.id)}>Send response</Button>
+                          <Button size="sm" disabled={(responseTexts[q.id] || '').length < 10} onClick={() => respond(q.id)}>Send response</Button>
                           <Select size="sm" value={q.status} onChange={(e) => setStatus(q.id, e.target.value)}>
                             {QUESTION_STATUSES.map((st) => <option key={st} value={st}>{st.replace('_', ' ')}</option>)}
                           </Select>

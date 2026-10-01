@@ -75,6 +75,7 @@
 .login-error {
   font-size: 13px; color: var(--danger); background: var(--danger-bg);
   border-radius: 8px; padding: 10px 12px; margin: 6px 0 0;
+  white-space: pre-line;
 }
 
 .login-link-btn {

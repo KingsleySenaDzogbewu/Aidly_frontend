@@ -79,6 +79,13 @@ function LessonRoutesTab() {
 
   const generate = async (e) => {
     e.preventDefault();
+    // A degrees/minutes/seconds value like 5°42'22.5"N isn't a number - catch it
+    // here, since the backend would only see an empty field and say it's "required".
+    const coords = [form.startLatitude, form.startLongitude, form.destinationLatitude, form.destinationLongitude];
+    if (coords.some((v) => !Number.isFinite(Number(String(v).trim())))) {
+      toast.error('Coordinates must be decimal numbers, e.g. 5.70625 and -0.08222 (not 5°42\'22.5"N). In Google Maps, right-click the spot to copy them.');
+      return;
+    }
     setGenerating(true);
     try {
       await LessonRouteApi.generate({
@@ -117,13 +124,13 @@ function LessonRoutesTab() {
       {showForm && (
         <Card className="fade-in respo-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
           <form onSubmit={generate} style={{ display: 'contents' }}>
-            <Field label="Booking ID" required className="span-2"><Input required value={form.bookingId} onChange={(e) => setForm((f) => ({ ...f, bookingId: e.target.value }))} /></Field>
-            <Field label="Start location" required><Input required value={form.startLocation} onChange={(e) => setForm((f) => ({ ...f, startLocation: e.target.value }))} /></Field>
-            <Field label="Destination" required><Input required value={form.destinationLocation} onChange={(e) => setForm((f) => ({ ...f, destinationLocation: e.target.value }))} /></Field>
-            <Field label="Start latitude" required><Input required value={form.startLatitude} onChange={(e) => setForm((f) => ({ ...f, startLatitude: e.target.value }))} /></Field>
-            <Field label="Start longitude" required><Input required value={form.startLongitude} onChange={(e) => setForm((f) => ({ ...f, startLongitude: e.target.value }))} /></Field>
-            <Field label="Destination latitude" required><Input required value={form.destinationLatitude} onChange={(e) => setForm((f) => ({ ...f, destinationLatitude: e.target.value }))} /></Field>
-            <Field label="Destination longitude" required><Input required value={form.destinationLongitude} onChange={(e) => setForm((f) => ({ ...f, destinationLongitude: e.target.value }))} /></Field>
+            <Field label="Booking ID" required className="span-2" hint="The number on the booking card, e.g. “Booking #1” → 1. Must be one of your own bookings."><Input required inputMode="numeric" value={form.bookingId} onChange={(e) => setForm((f) => ({ ...f, bookingId: e.target.value }))} /></Field>
+            <Field label="Start location" required hint="2–500 characters"><Input required minLength={2} maxLength={500} value={form.startLocation} onChange={(e) => setForm((f) => ({ ...f, startLocation: e.target.value }))} /></Field>
+            <Field label="Destination" required hint="2–500 characters"><Input required minLength={2} maxLength={500} value={form.destinationLocation} onChange={(e) => setForm((f) => ({ ...f, destinationLocation: e.target.value }))} /></Field>
+            <Field label="Start latitude" required hint="Decimal number, e.g. 5.70625 (right-click the spot in Google Maps to copy it)"><Input required inputMode="decimal" placeholder="5.70625" value={form.startLatitude} onChange={(e) => setForm((f) => ({ ...f, startLatitude: e.target.value }))} /></Field>
+            <Field label="Start longitude" required hint="Decimal number, e.g. -0.08222 (west is negative)"><Input required inputMode="decimal" placeholder="-0.08222" value={form.startLongitude} onChange={(e) => setForm((f) => ({ ...f, startLongitude: e.target.value }))} /></Field>
+            <Field label="Destination latitude" required hint="Decimal number, e.g. 5.65447"><Input required inputMode="decimal" placeholder="5.65447" value={form.destinationLatitude} onChange={(e) => setForm((f) => ({ ...f, destinationLatitude: e.target.value }))} /></Field>
+            <Field label="Destination longitude" required hint="Decimal number, e.g. -0.19486 (west is negative)"><Input required inputMode="decimal" placeholder="-0.19486" value={form.destinationLongitude} onChange={(e) => setForm((f) => ({ ...f, destinationLongitude: e.target.value }))} /></Field>
             <Button type="submit" className="span-2" loading={generating}>Generate route</Button>
           </form>
         </Card>

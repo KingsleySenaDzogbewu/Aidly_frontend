@@ -97,7 +97,15 @@ http.interceptors.response.use(
     }
 
     const body = error.response.data;
-    const message = (body && body.message) || `Request failed (${error.response.status})`;
+    // Validation failures carry the useful detail in `errors` ({ field: ["Response
+    // must be between 10 and 3000 characters"] }) - show those sentences, one per
+    // line, instead of the bare "Validation failed" headline.
+    const fieldErrors = body && body.errors && typeof body.errors === 'object'
+      ? Object.values(body.errors).flat().filter((m) => typeof m === 'string' && m)
+      : [];
+    const message = fieldErrors.length > 0
+      ? fieldErrors.join('\n')
+      : (body && body.message) || `Request failed (${error.response.status})`;
 
     if (error.response.status === 401) {
       if (original?.noAuth) {

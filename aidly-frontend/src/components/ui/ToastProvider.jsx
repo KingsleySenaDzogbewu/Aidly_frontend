@@ -22,7 +22,8 @@ export function ToastProvider({ children }) {
     setToasts((t) => {
       if (t.some((x) => x.type === type && x.message === message)) return t;
       const id = ++seq;
-      timers.current[id] = setTimeout(() => dismiss(id), 4500);
+      // Errors explain what to fix, so they stay up longer than confirmations.
+      timers.current[id] = setTimeout(() => dismiss(id), type === 'error' ? 7000 : 4500);
       return [...t, { id, type, message }];
     });
   }, [dismiss]);
