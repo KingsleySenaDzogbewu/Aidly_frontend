@@ -340,7 +340,8 @@ export default function CoursesPage() {
   const loadCourses = async () => {
     setLoading(true);
     try {
-      let list = await CourseApi.list();
+      // Admins oversee their school's drafts too, not just published courses.
+      let list = await CourseApi.list(isAdmin ? { includeDrafts: true } : undefined);
       if (isInstructor) {
         try {
           const mine = await CourseApi.mine();
@@ -411,7 +412,8 @@ export default function CoursesPage() {
         courseId: selectedId,
         title: lessonForm.title,
         description: lessonForm.description || null,
-        videoUrl: lessonForm.videoUrl,
+        // Optional: a lesson can be video, PDF materials, or both.
+        videoUrl: lessonForm.videoUrl.trim() || null,
         lessonOrder: Number(lessonForm.lessonOrder),
         durationSeconds: lessonForm.durationSeconds ? Number(lessonForm.durationSeconds) : null,
       });
@@ -549,10 +551,11 @@ export default function CoursesPage() {
               <Card tight className="fade-in respo-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14, background: 'var(--surface-muted)' }}>
                 <form onSubmit={addLesson} style={{ display: 'contents' }}>
                   <Input size="sm" required placeholder="Lesson title" value={lessonForm.title} onChange={(e) => setLessonForm((f) => ({ ...f, title: e.target.value }))} />
-                  <Input size="sm" required placeholder="Video URL" value={lessonForm.videoUrl} onChange={(e) => setLessonForm((f) => ({ ...f, videoUrl: e.target.value }))} />
+                  <Input size="sm" type="url" placeholder="Video URL (optional)" title="Leave empty for a PDF-only lesson" value={lessonForm.videoUrl} onChange={(e) => setLessonForm((f) => ({ ...f, videoUrl: e.target.value }))} />
                   <Input size="sm" type="number" min={1} required placeholder="Order" value={lessonForm.lessonOrder} onChange={(e) => setLessonForm((f) => ({ ...f, lessonOrder: e.target.value }))} />
                   <Input size="sm" type="number" min={0} placeholder="Duration (sec)" value={lessonForm.durationSeconds} onChange={(e) => setLessonForm((f) => ({ ...f, durationSeconds: e.target.value }))} />
                   <Textarea rows={2} placeholder="Description" className="span-2" value={lessonForm.description} onChange={(e) => setLessonForm((f) => ({ ...f, description: e.target.value }))} />
+                  <div className="field-hint span-2">No video? Leave the video URL empty. The lesson's Materials panel opens right after, so you can attach the PDF.</div>
                   <Button type="submit" className="span-2" loading={addingLesson}>Add lesson</Button>
                 </form>
               </Card>
@@ -581,7 +584,7 @@ export default function CoursesPage() {
                       <div>
                         <div style={{ fontSize: 13.5, fontWeight: 600 }}>{v.lessonOrder}. {v.title}</div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                          {v.published ? 'Published' : 'Draft'}{v.durationSeconds ? ` · ${Math.round(v.durationSeconds / 60)} min` : ''}
+                          {v.published ? 'Published' : 'Draft'}{v.videoUrl ? '' : ' · Materials only'}{v.durationSeconds ? ` · ${Math.round(v.durationSeconds / 60)} min` : ''}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>

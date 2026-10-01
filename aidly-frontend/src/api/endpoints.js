@@ -76,7 +76,8 @@ export const CourseApi = {
   unpublish: (courseId) => http.put(`/courses/${courseId}/unpublish`),
   archive: (courseId) => http.put(`/courses/${courseId}/archive`),
   get: (courseId) => http.get(`/courses/${courseId}`),
-  list: () => http.get('/courses'),
+  // Published courses of the caller's school. Admins can pass { includeDrafts: true }.
+  list: (params) => http.get('/courses', params ? { params } : undefined),
   mine: () => http.get('/courses/mine'),
 };
 
@@ -139,6 +140,8 @@ export const LessonRouteApi = {
   get: (id) => http.get(`/lesson-routes/${id}`),
   getByBooking: (bookingId) => http.get(`/lesson-routes/booking/${bookingId}`),
   listByInstructor: (instructorId, params) => http.get(`/lesson-routes/instructor/${instructorId}`, { params }),
+  // Student caller: routes for their own bookings (paginated).
+  mine: (params) => http.get('/lesson-routes/me', { params }),
   listAll: (params) => http.get('/lesson-routes', { params }),
   remove: (id) => http.delete(`/lesson-routes/${id}`),
 };

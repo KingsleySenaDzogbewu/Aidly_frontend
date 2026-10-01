@@ -85,9 +85,13 @@ export default function LiveSessionsPage() {
     if (!user?.studentProfileId) { toast.error('No student profile on this account'); return; }
     try {
       await LiveSessionApi.register(id, user.studentProfileId);
-      toast.success('Registered for session');
+      toast.success('You’re registered — the meeting link is now on the session');
       load();
-    } catch (err) { toast.error(err.message); }
+    } catch (err) {
+      // Registered earlier (another tab/device) - that's the outcome they wanted.
+      if (/already registered/i.test(err.message || '')) { toast.info('You’re already registered for this session'); load(); return; }
+      toast.error(err.message);
+    }
   };
 
   const changeStatus = async (id, status) => {
@@ -195,27 +199,38 @@ export default function LiveSessionsPage() {
         </EmptyState>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {sessions.map((s) => (
+          {sessions.map((s) => {
+            // Registration unlocks the meeting link for students: show the link
+            // only when the backend sends it, and say how to get it otherwise.
+            const registered = isStudent && s.registered === true;
+            const full = s.maxParticipants != null && (s.registeredCount ?? 0) >= s.maxParticipants;
+            const canRegister = isStudent && !registered && (s.status === 'SCHEDULED' || s.status === 'IN_PROGRESS');
+            return (
             <Card key={s.id} tight hover>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <div style={{ fontSize: 15, fontWeight: 700 }}>{s.title}</div>
-                    <Badge status={s.status}>{s.status}</Badge>
+                    <Badge status={s.status}>{s.status.replace('_', ' ')}</Badge>
+                    {registered && <Badge variant="info">Registered ✓</Badge>}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-                    {fmtDateTime(s.scheduledAt)} · {s.durationMinutes} min · Instructor: {s.instructorName || s.instructorId} · {s.registeredCount ?? 0} registered
+                    {fmtDateTime(s.scheduledAt)} · {s.durationMinutes} min · Instructor: {s.instructorName || s.instructorId} · {s.registeredCount ?? 0}{s.maxParticipants ? ` / ${s.maxParticipants}` : ''} registered
                   </div>
                   {s.description && <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 6 }}>{s.description}</div>}
-                  {s.meetingUrl && (
+                  {s.meetingUrl ? (
                     <a href={s.meetingUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, marginTop: 6, display: 'inline-block' }}>
                       Join meeting link ↗
                     </a>
-                  )}
+                  ) : canRegister && !full ? (
+                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 6 }}>Register to get the meeting link.</div>
+                  ) : null}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
-                  {isStudent && s.status === 'SCHEDULED' && (
-                    <Button size="sm" onClick={() => register(s.id)}>Register</Button>
+                  {canRegister && (
+                    full
+                      ? <Button size="sm" disabled>Session full</Button>
+                      : <Button size="sm" onClick={() => register(s.id)}>Register</Button>
                   )}
                   {canManage && (
                     <>
@@ -254,7 +269,8 @@ export default function LiveSessionsPage() {
                 </div>
               )}
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

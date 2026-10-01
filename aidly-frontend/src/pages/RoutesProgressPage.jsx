@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { LessonRouteApi, LicenseWorkflowApi, DrivingAssessmentApi, LICENSE_STAGES } from '../api/endpoints';
@@ -54,8 +55,9 @@ function TheoryRing({ percent }) {
 }
 
 function LessonRoutesTab() {
-  const { user, isInstructor } = useAuth();
+  const { user, isInstructor, isStudent } = useAuth();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
 
   const [routes, setRoutes] = useState([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
@@ -64,18 +66,32 @@ function LessonRoutesTab() {
   const [generating, setGenerating] = useState(false);
   const [lookupBookingId, setLookupBookingId] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
-  const [expandedId, setExpandedId] = useState(null);
+  // ?route=<id> (from a booking's "View route") opens that route's map straight away.
+  const [expandedId, setExpandedId] = useState(() => Number(searchParams.get('route')) || null);
+
+  // Instructors see the routes they've planned; students see the routes for their own bookings.
+  const hasOwnList = isInstructor || isStudent;
 
   const loadMine = async () => {
-    if (!isInstructor || !user?.instructorProfileId) return;
+    if (isInstructor && !user?.instructorProfileId) return;
+    if (!hasOwnList) return;
     setLoadingRoutes(true);
     try {
-      const res = await LessonRouteApi.listByInstructor(user.instructorProfileId);
+      const res = isInstructor
+        ? await LessonRouteApi.listByInstructor(user.instructorProfileId)
+        : await LessonRouteApi.mine();
       setRoutes(res?.content || res || []);
     } catch (err) { toast.error(err.message); }
     finally { setLoadingRoutes(false); }
   };
   useEffect(() => { loadMine(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user]);
+
+  // Bring the route linked from a booking into view once the list has loaded.
+  useEffect(() => {
+    const linked = Number(searchParams.get('route'));
+    if (!linked || routes.length === 0) return;
+    document.getElementById(`route-${linked}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [routes, searchParams]);
 
   const generate = async (e) => {
     e.preventDefault();
@@ -136,25 +152,38 @@ function LessonRoutesTab() {
         </Card>
       )}
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
-        <Input placeholder="Look up route by booking ID" value={lookupBookingId} onChange={(e) => setLookupBookingId(e.target.value)} style={{ maxWidth: 240, flex: '1 1 200px' }} />
-        <Button variant="outline" onClick={lookup}>Look up</Button>
-      </div>
+      {/* Students get their own list below, so they don't need to know booking IDs. */}
+      {!isStudent && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+          <Input placeholder="Look up route by booking ID" value={lookupBookingId} onChange={(e) => setLookupBookingId(e.target.value)} style={{ maxWidth: 240, flex: '1 1 200px' }} />
+          <Button variant="outline" onClick={lookup}>Look up</Button>
+        </div>
+      )}
 
       <RouteResultCard route={lookupResult} />
 
-      {(isInstructor) && (loadingRoutes ? (
+      {isStudent && (
+        <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
+          The roads you&rsquo;ll drive on in your practical lessons, planned by your instructor.
+        </p>
+      )}
+
+      {hasOwnList && (loadingRoutes ? (
         <SkeletonList count={2} small />
       ) : routes.length === 0 ? (
-        <EmptyState icon={<Icons.IconMap size={22} />} title="No routes yet" />
+        <EmptyState icon={<Icons.IconMap size={22} />} title="No routes yet">
+          {isStudent ? 'When your instructor plans a route for one of your lessons, it appears here.' : null}
+        </EmptyState>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {routes.map((r) => (
-            <Card key={r.id} tight hover style={{ overflow: 'hidden' }}>
+            <Card key={r.id} id={`route-${r.id}`} tight hover style={{ overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{r.startLocation} → {r.destinationLocation}</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>{r.distanceKm} km · {r.durationMinutes} min</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                    {r.distanceKm} km · {r.durationMinutes} min · Booking #{r.bookingId}{isStudent && r.instructorName ? ` · ${r.instructorName}` : ''}
+                  </div>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
                   {expandedId === r.id ? 'Hide map' : 'Show map'}

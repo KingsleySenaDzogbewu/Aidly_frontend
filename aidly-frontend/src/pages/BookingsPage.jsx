@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
-import { BookingApi, VehicleApi } from '../api/endpoints';
+import { BookingApi, VehicleApi, LessonRouteApi } from '../api/endpoints';
 import { Button, Card, Badge, Field, Input, Textarea, Select, Tabs, EmptyState, SkeletonList, Icons, Reveal, StudentPicker } from '../components/ui';
 import { fmtDateTime, fmtTime, fmtWeekday, fromLocalDateTimeInput } from '../utils/format';
 import useIsMobile from '../hooks/useIsMobile';
@@ -25,6 +26,27 @@ export default function BookingsPage() {
   const toast = useToast();
   const canManage = isAdmin || isInstructor;
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+
+  // Students: which of their bookings have a planned route (bookingId -> routeId),
+  // so those lessons can offer "View route".
+  const [routeByBooking, setRouteByBooking] = useState({});
+  useEffect(() => {
+    if (!isStudent) return;
+    LessonRouteApi.mine()
+      .then((res) => {
+        const map = {};
+        (res?.content || res || []).forEach((r) => { map[r.bookingId] = r.id; });
+        setRouteByBooking(map);
+      })
+      .catch(() => {});
+  }, [isStudent]);
+
+  const viewRouteButton = (b, style) => (isStudent && routeByBooking[b.id] ? (
+    <Button size="sm" variant="outline" style={style} onClick={() => navigate(`/routes?route=${routeByBooking[b.id]}`)}>
+      <Icons.IconMap size={13} /> View route
+    </Button>
+  ) : null);
 
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -198,6 +220,7 @@ export default function BookingsPage() {
                     <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>{b.bookingType?.replace('_', ' ')} · {b.status}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>Booking #{b.id}</div>
                     {canManage && needsCompleting(b) && <div style={{ marginTop: 6 }}><NeedsCompletingTag /></div>}
+                    {viewRouteButton(b, { marginTop: 8, width: '100%' })}
                     {canManage && (
                       <div style={{ display: 'flex', gap: 5, marginTop: 8 }}>
                         <button className="btn btn-outline btn-sm" style={{ flex: 1, padding: '7px 5px', fontSize: 11 }} onClick={() => doAction(b.id, 'confirm')}>Confirm</button>
@@ -230,6 +253,7 @@ export default function BookingsPage() {
                     <div style={{ fontSize: 11.5, color: 'var(--text-faint)', marginTop: 4 }}>Booking #{b.id}</div>
                     {b.notes && <div style={{ fontSize: 12.5, color: 'var(--text)', marginTop: 6 }}>{b.notes}</div>}
                   </div>
+                  {viewRouteButton(b, { flexShrink: 0 })}
                   {canManage && (
                     <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
                       <Button size="sm" variant="outline" onClick={() => doAction(b.id, 'confirm')}>Confirm</Button>

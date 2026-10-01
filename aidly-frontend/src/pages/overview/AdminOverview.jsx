@@ -17,7 +17,7 @@ export default function AdminOverview({ user, roleLabel }) {
       setLoading(true);
       const results = await Promise.allSettled([
         SchoolApi.list(),
-        CourseApi.list(),
+        CourseApi.list({ includeDrafts: true }),
         LessonQuestionApi.byStatus('PENDING'),
         LessonNoteApi.listAll(),
       ]);
