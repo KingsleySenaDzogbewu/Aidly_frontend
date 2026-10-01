@@ -160,5 +160,4 @@ img { max-width: 100%; display: block; }
     right: 12px;
     max-width: none;
   }
-  .slow-hint { max-width: calc(100vw - 40px); text-align: center; font-size: 12px; }
 }
