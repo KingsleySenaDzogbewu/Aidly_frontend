@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../features/notifications/NotificationsContext';
-import { Button, Card, SkeletonList, EmptyState, Icons, Reveal } from '../components/ui';
+import { Button, Card, SkeletonList, EmptyState, Icons, Reveal, useToast } from '../components/ui';
 import { fmtDateTime } from '../utils/format';
 
 // "New question from …" (to instructors) / answered-question notices (to
@@ -9,6 +9,9 @@ const isQuestionNotification = (n) => /question/i.test(n.subject || '');
 
 export default function NotificationsPage() {
   const { items, loading, markRead } = useNotifications();
+  const toast = useToast();
+
+  const markAsRead = (n) => markRead(n.id).catch((err) => toast.error(err.message || 'Couldn’t mark this notification as read. Please try again.'));
   const navigate = useNavigate();
 
   const viewQuestion = (n) => {
@@ -50,7 +53,7 @@ export default function NotificationsPage() {
                         <Button size="sm" onClick={() => viewQuestion(n)}>View question</Button>
                       )}
                       {unread && (
-                        <Button size="sm" variant="outline" onClick={() => markRead(n.id)}>
+                        <Button size="sm" variant="outline" onClick={() => markAsRead(n)}>
                           Mark read
                         </Button>
                       )}

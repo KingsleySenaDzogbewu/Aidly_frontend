@@ -505,7 +505,13 @@ function AssessmentsTab() {
         </div>
       )}
 
-      {loading || assessments === null ? (
+      {/* Students and instructors load their own list straight away; an admin has
+          nothing to show until they look a student up. */}
+      {!loading && assessments === null && !isStudent && !isInstructor ? (
+        <EmptyState icon={<Icons.IconShield size={22} />} title="Look up a student">
+          Enter a student profile ID above to see their driving assessments.
+        </EmptyState>
+      ) : loading || assessments === null ? (
         <SkeletonList count={2} small />
       ) : assessments.length === 0 ? (
         <EmptyState icon={<Icons.IconShield size={22} />} title="No driving assessments yet" />

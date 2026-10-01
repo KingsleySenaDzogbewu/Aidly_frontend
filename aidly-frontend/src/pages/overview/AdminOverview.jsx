@@ -50,7 +50,8 @@ export default function AdminOverview({ user, roleLabel }) {
           delay={280}
           items={[
             { to: '/fleet', label: 'Manage schools & fleet', hint: 'Schools, vehicles, availability', icon: Icons.IconSchool },
-            { to: '/admin?tab=directory', label: 'Browse students & instructors', hint: 'Find a profile without typing an ID', icon: Icons.IconUser },
+            // The Directory tab is bootstrap-only; a regular admin's people live on "Your school".
+            { to: user?.bootstrapAdmin ? '/admin?tab=directory' : '/fleet', label: 'Browse students & instructors', hint: 'Find a profile without typing an ID', icon: Icons.IconUser },
             { to: '/admin', label: 'Administration', hint: 'Users, roles, accounts', icon: Icons.IconShield },
             { to: '/courses', label: 'Oversee courses', hint: 'Publish, archive, assign instructors', icon: Icons.IconBook },
             { to: '/notes', label: 'Review pending questions', hint: 'Across the whole school', icon: Icons.IconInbox },

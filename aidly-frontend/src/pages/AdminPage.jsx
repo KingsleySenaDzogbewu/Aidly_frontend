@@ -316,8 +316,6 @@ export default function AdminPage() {
   const { isBootstrapAdmin } = useAuth();
   const toast = useToast();
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(searchParams.get('tab') || 'register');
-
   // Directory (browse-any-school) only makes sense for the bootstrap admin -
   // a regular admin's own school directory now lives on the Fleet page's
   // "Your school" dashboard instead.
@@ -327,6 +325,11 @@ export default function AdminPage() {
     { value: 'manage', label: 'Manage accounts' },
     { value: 'roles', label: 'Roles' },
   ];
+
+  // A ?tab= this admin can't see (e.g. "directory" for a regular admin) would
+  // otherwise leave the page with no content - fall back to the first tab.
+  const requestedTab = searchParams.get('tab');
+  const [tab, setTab] = useState(tabOptions.some((t) => t.value === requestedTab) ? requestedTab : 'register');
 
   return (
     <div className="fade-in">

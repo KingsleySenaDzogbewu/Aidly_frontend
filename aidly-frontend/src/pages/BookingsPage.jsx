@@ -4,6 +4,7 @@ import { useToast } from '../components/ui';
 import { BookingApi, VehicleApi } from '../api/endpoints';
 import { Button, Card, Badge, Field, Input, Textarea, Select, Tabs, EmptyState, SkeletonList, Icons, Reveal, StudentPicker } from '../components/ui';
 import { fmtDateTime, fmtTime, fmtWeekday, fromLocalDateTimeInput } from '../utils/format';
+import useIsMobile from '../hooks/useIsMobile';
 
 const BOOKING_TYPES = ['ROAD_LESSON', 'THEORY_SESSION', 'DRIVING_ASSESSMENT', 'PRACTICE_TEST'];
 
@@ -23,6 +24,7 @@ export default function BookingsPage() {
   const { user, isAdmin, isInstructor, isStudent } = useAuth();
   const toast = useToast();
   const canManage = isAdmin || isInstructor;
+  const isMobile = useIsMobile();
 
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -176,9 +178,15 @@ export default function BookingsPage() {
           {isAdmin ? 'Look up a student or instructor above.' : 'Nothing scheduled yet.'}
         </EmptyState>
       ) : view === 'calendar' ? (
-        <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch' }}>
+        <>
+        {/* On phones each day fills most of the width (one full day + a peek of the
+            next) and snaps into place, instead of 220px columns cut off mid-card. */}
+        {isMobile && dayGroups.length > 1 && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Swipe for more days →</div>
+        )}
+        <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch', scrollSnapType: isMobile ? 'x mandatory' : undefined }}>
           {dayGroups.map((grp) => (
-            <div key={grp.date} style={{ flex: '0 0 220px' }}>
+            <div key={grp.date} style={{ flex: isMobile ? '0 0 85%' : '0 0 220px', scrollSnapAlign: isMobile ? 'start' : undefined }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10, paddingBottom: 8, borderBottom: '2px solid var(--border)' }}>
                 {grp.date === 'Unscheduled' ? grp.date : fmtWeekday(grp.date)}
               </div>
@@ -203,6 +211,7 @@ export default function BookingsPage() {
             </div>
           ))}
         </div>
+        </>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {bookings.map((b, i) => (
