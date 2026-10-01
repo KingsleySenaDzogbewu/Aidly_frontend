@@ -1,19 +1,6 @@
 import { MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet';
 import L from 'leaflet';
-
-// Labels are instructor-typed text going into raw HTML - escape them so a
-// location name can never inject markup/script into viewers' browsers.
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-}
-
-function pinIcon(label, color) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="background:${color};color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:100px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.25);transform:translate(-4px,-30px);">${escapeHtml(label)}</div>`,
-    iconAnchor: [0, 0],
-  });
-}
+import { pinIcon, START_COLOR, DESTINATION_COLOR } from './pins';
 
 export default function RouteMap({ start, destination, path, height = 260 }) {
   const hasValid = start && destination
@@ -40,8 +27,8 @@ export default function RouteMap({ start, destination, path, height = 260 }) {
           attribution='&copy; OpenStreetMap contributors'
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <Marker position={startPos} icon={pinIcon(start.label || 'Start', '#2f5d3a')} />
-        <Marker position={destPos} icon={pinIcon(destination.label || 'Destination', '#8a3a2f')} />
+        <Marker position={startPos} icon={pinIcon(start.label || 'Start', START_COLOR)} />
+        <Marker position={destPos} icon={pinIcon(destination.label || 'Destination', DESTINATION_COLOR)} />
         <Polyline positions={line} pathOptions={{ color: '#2f5d3a', weight: 4, opacity: 0.85, dashArray: '1,8' }} />
       </MapContainer>
     </div>

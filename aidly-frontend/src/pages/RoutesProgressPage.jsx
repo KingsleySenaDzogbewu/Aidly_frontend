@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
-import { LessonRouteApi, LicenseWorkflowApi, DrivingAssessmentApi, LICENSE_STAGES } from '../api/endpoints';
+import { LessonRouteApi, LicenseWorkflowApi, DrivingAssessmentApi, BookingApi, LICENSE_STAGES } from '../api/endpoints';
 import { Button, Card, Badge, Field, Input, Select, Textarea, Tabs, EmptyState, SkeletonList, Icons, Reveal } from '../components/ui';
 import RouteMap from '../features/routes/RouteMap';
+import { START_COLOR, DESTINATION_COLOR } from '../features/routes/pins';
+import RoutePointsPicker from '../features/routes/RoutePointsPicker';
+import { parseLatLng, formatLatLng } from '../utils/coordinates';
 import RoadMotif from '../components/motion/RoadMotif';
 import useCountUp from '../hooks/useCountUp';
 import { humanize, fmtDateTime, toLocalDateTimeInput, fromLocalDateTimeInput } from '../utils/format';
 import './routes-progress.css';
 
-const emptyRoute = { bookingId: '', startLocation: '', destinationLocation: '', startLatitude: '', startLongitude: '', destinationLatitude: '', destinationLongitude: '' };
+const emptyPlan = { bookingId: '', startLocation: '', destinationLocation: '', start: null, destination: null };
+const POINT_LABELS = { start: 'Start', destination: 'Destination' };
 const ASSESSMENT_RESULTS = ['PASSED', 'FAILED', 'NEEDS_IMPROVEMENT', 'PENDING'];
 
 // A colorful trail rather than a single flat hue — one accent per stage,
@@ -62,7 +66,12 @@ function LessonRoutesTab() {
   const [routes, setRoutes] = useState([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyRoute);
+  const [plan, setPlan] = useState(emptyPlan);
+  const [activePoint, setActivePoint] = useState('start'); // which pin the next map click places
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualText, setManualText] = useState({ start: '', destination: '' });
+  const [focusPoint, setFocusPoint] = useState(null);
+  const [bookingOptions, setBookingOptions] = useState(null); // null = loading
   const [generating, setGenerating] = useState(false);
   const [lookupBookingId, setLookupBookingId] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
@@ -93,32 +102,78 @@ function LessonRoutesTab() {
     document.getElementById(`route-${linked}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [routes, searchParams]);
 
+  // The instructor's own upcoming lessons, so the route is attached by choosing a
+  // lesson rather than typing a booking ID (the backend only accepts their own).
+  useEffect(() => {
+    if (!showForm || !isInstructor || !user?.instructorProfileId) return;
+    setBookingOptions(null);
+    const now = Date.now();
+    const from = new Date(now - 7 * 86400000).toISOString().slice(0, 19);
+    const to = new Date(now + 60 * 86400000).toISOString().slice(0, 19);
+    BookingApi.listByInstructor(user.instructorProfileId, from, to)
+      .then((list) => setBookingOptions((list || [])
+        .filter((b) => b.status === 'PENDING' || b.status === 'CONFIRMED')
+        .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))))
+      .catch(() => setBookingOptions([]));
+  }, [showForm, isInstructor, user?.instructorProfileId]);
+
+  const routedBookingIds = new Set(routes.map((r) => r.bookingId));
+
+  // A pin placed or dragged on the map.
+  const placePoint = (which, point) => {
+    setPlan((p) => ({ ...p, [which]: point }));
+    setManualText((t) => ({ ...t, [which]: formatLatLng(point) }));
+    if (which === 'start' && !plan.destination) setActivePoint('destination');
+  };
+
+  // Coordinates typed or pasted in any common format.
+  const typePoint = (which, text) => {
+    setManualText((t) => ({ ...t, [which]: text }));
+    const point = parseLatLng(text);
+    if (point) {
+      setPlan((p) => ({ ...p, [which]: point }));
+      setFocusPoint(point);
+    }
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setPlan(emptyPlan);
+    setManualText({ start: '', destination: '' });
+    setActivePoint('start');
+    setManualOpen(false);
+  };
+
   const generate = async (e) => {
     e.preventDefault();
-    // A degrees/minutes/seconds value like 5°42'22.5"N isn't a number - catch it
-    // here, since the backend would only see an empty field and say it's "required".
-    const coords = [form.startLatitude, form.startLongitude, form.destinationLatitude, form.destinationLongitude];
-    if (coords.some((v) => !Number.isFinite(Number(String(v).trim())))) {
-      toast.error('Coordinates must be decimal numbers, e.g. 5.70625 and -0.08222 (not 5°42\'22.5"N). In Google Maps, right-click the spot to copy them.');
+    if (!plan.bookingId) { toast.error('Choose the lesson this route is for.'); return; }
+    if (!plan.start || !plan.destination) {
+      toast.error('Place both the start and destination pins on the map (or enter their coordinates).');
       return;
     }
     setGenerating(true);
     try {
-      await LessonRouteApi.generate({
-        bookingId: Number(form.bookingId),
-        startLocation: form.startLocation,
-        destinationLocation: form.destinationLocation,
-        startLatitude: Number(form.startLatitude),
-        startLongitude: Number(form.startLongitude),
-        destinationLatitude: Number(form.destinationLatitude),
-        destinationLongitude: Number(form.destinationLongitude),
+      const created = await LessonRouteApi.generate({
+        bookingId: Number(plan.bookingId),
+        startLocation: plan.startLocation.trim(),
+        destinationLocation: plan.destinationLocation.trim(),
+        startLatitude: plan.start.lat,
+        startLongitude: plan.start.lng,
+        destinationLatitude: plan.destination.lat,
+        destinationLongitude: plan.destination.lng,
       });
-      toast.success('Route generated');
-      setShowForm(false);
-      setForm(emptyRoute);
+      toast.success('Route generated — your student can see it on their bookings');
+      closeForm();
+      if (created?.id) setExpandedId(created.id);
       loadMine();
-    } catch (err) { toast.error(err.message); }
-    finally { setGenerating(false); }
+    } catch (err) {
+      // The routing service can't snap a pin that's far from any road.
+      if (/routable point/i.test(err.message || '')) {
+        toast.error('One of the pins isn’t close to a road. Move the start or destination pin onto a street and try again.');
+      } else {
+        toast.error(err.message);
+      }
+    } finally { setGenerating(false); }
   };
 
   const lookup = async () => {
@@ -131,23 +186,110 @@ function LessonRoutesTab() {
     <div>
       {isInstructor && (
         <div style={{ marginBottom: 16 }}>
-          <Button onClick={() => setShowForm((s) => !s)}>
+          <Button onClick={() => (showForm ? closeForm() : setShowForm(true))}>
             <Icons.IconPlus size={14} /> {showForm ? 'Cancel' : 'Generate route'}
           </Button>
         </div>
       )}
 
       {showForm && (
-        <Card className="fade-in respo-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
-          <form onSubmit={generate} style={{ display: 'contents' }}>
-            <Field label="Booking ID" required className="span-2" hint="The number on the booking card, e.g. “Booking #1” → 1. Must be one of your own bookings."><Input required inputMode="numeric" value={form.bookingId} onChange={(e) => setForm((f) => ({ ...f, bookingId: e.target.value }))} /></Field>
-            <Field label="Start location" required hint="2–500 characters"><Input required minLength={2} maxLength={500} value={form.startLocation} onChange={(e) => setForm((f) => ({ ...f, startLocation: e.target.value }))} /></Field>
-            <Field label="Destination" required hint="2–500 characters"><Input required minLength={2} maxLength={500} value={form.destinationLocation} onChange={(e) => setForm((f) => ({ ...f, destinationLocation: e.target.value }))} /></Field>
-            <Field label="Start latitude" required hint="Decimal number, e.g. 5.70625 (right-click the spot in Google Maps to copy it)"><Input required inputMode="decimal" placeholder="5.70625" value={form.startLatitude} onChange={(e) => setForm((f) => ({ ...f, startLatitude: e.target.value }))} /></Field>
-            <Field label="Start longitude" required hint="Decimal number, e.g. -0.08222 (west is negative)"><Input required inputMode="decimal" placeholder="-0.08222" value={form.startLongitude} onChange={(e) => setForm((f) => ({ ...f, startLongitude: e.target.value }))} /></Field>
-            <Field label="Destination latitude" required hint="Decimal number, e.g. 5.65447"><Input required inputMode="decimal" placeholder="5.65447" value={form.destinationLatitude} onChange={(e) => setForm((f) => ({ ...f, destinationLatitude: e.target.value }))} /></Field>
-            <Field label="Destination longitude" required hint="Decimal number, e.g. -0.19486 (west is negative)"><Input required inputMode="decimal" placeholder="-0.19486" value={form.destinationLongitude} onChange={(e) => setForm((f) => ({ ...f, destinationLongitude: e.target.value }))} /></Field>
-            <Button type="submit" className="span-2" loading={generating}>Generate route</Button>
+        <Card className="fade-in" style={{ marginBottom: 18 }}>
+          <form onSubmit={generate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* 1. Which lesson */}
+            <Field label="Lesson" required hint="Your upcoming lessons. The student on that booking will see this route.">
+              {bookingOptions === null ? (
+                <Select disabled value=""><option>Loading your lessons…</option></Select>
+              ) : bookingOptions.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '6px 0' }}>
+                  You have no upcoming lessons. Create a booking on the <Link to="/bookings">Bookings</Link> page first.
+                </div>
+              ) : (
+                <Select required value={plan.bookingId} onChange={(e) => setPlan((p) => ({ ...p, bookingId: e.target.value }))}>
+                  <option value="">Choose a lesson…</option>
+                  {bookingOptions.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.studentName} · {fmtDateTime(b.scheduledAt)} · {humanize(b.bookingType)}{routedBookingIds.has(b.id) ? ' · has a route' : ''}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+
+            {/* 2. Where: pins on the map */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {['start', 'destination'].map((which) => {
+                  const isActive = activePoint === which;
+                  const color = which === 'start' ? START_COLOR : DESTINATION_COLOR;
+                  return (
+                    <button
+                      key={which}
+                      type="button"
+                      onClick={() => setActivePoint(which)}
+                      aria-pressed={isActive}
+                      className="btn btn-sm"
+                      style={{
+                        border: `1.5px solid ${isActive ? color : 'var(--border)'}`,
+                        background: isActive ? 'var(--accent-soft-bg)' : 'var(--surface)',
+                        color: 'var(--text)', display: 'inline-flex', alignItems: 'center', gap: 7,
+                      }}
+                    >
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
+                      {plan[which] ? `Move ${POINT_LABELS[which].toLowerCase()}` : `Set ${POINT_LABELS[which].toLowerCase()}`}
+                      {plan[which] && <Icons.IconCheck size={13} />}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="field-hint">
+                Click the map to place the <strong>{POINT_LABELS[activePoint].toLowerCase()}</strong> pin. Drag a pin to adjust it; zoom with + and −. Put pins on a road.
+              </div>
+              <RoutePointsPicker
+                start={plan.start}
+                destination={plan.destination}
+                active={activePoint}
+                onChange={placePoint}
+                focus={focusPoint}
+                center={routes[0] ? [routes[0].startLatitude, routes[0].startLongitude] : undefined}
+              />
+              <div style={{ display: 'flex', gap: '4px 18px', flexWrap: 'wrap', fontSize: 12, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                <span>Start: {plan.start ? formatLatLng(plan.start) : 'not set'}</span>
+                <span>Destination: {plan.destination ? formatLatLng(plan.destination) : 'not set'}</span>
+                <button type="button" className="login-link-btn" style={{ margin: 0, fontSize: 12 }} onClick={() => setManualOpen((o) => !o)}>
+                  {manualOpen ? 'Hide coordinate boxes' : 'Enter coordinates manually'}
+                </button>
+              </div>
+              {manualOpen && (
+                <div className="form-grid respo-two-col fade-in">
+                  {['start', 'destination'].map((which) => {
+                    const text = manualText[which];
+                    const unreadable = text.trim() !== '' && !parseLatLng(text);
+                    return (
+                      <Field
+                        key={which}
+                        label={`${POINT_LABELS[which]} coordinates`}
+                        error={unreadable ? 'Can’t read that. Use e.g. 5.70625, -0.08222 or 5°42\'22.5"N 0°04\'56.0"W' : undefined}
+                        hint="Paste from Google Maps (right-click a spot). Degrees like 5°42'22.5&quot;N work too."
+                      >
+                        <Input value={text} placeholder={which === 'start' ? '5.70625, -0.08222' : '5.65447, -0.19486'} onChange={(e) => typePoint(which, e.target.value)} />
+                      </Field>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Names students will read */}
+            <div className="form-grid respo-two-col">
+              <Field label="Start location name" required hint="What students will see, e.g. Santeo junction (2–500 characters)">
+                <Input required minLength={2} maxLength={500} value={plan.startLocation} onChange={(e) => setPlan((p) => ({ ...p, startLocation: e.target.value }))} />
+              </Field>
+              <Field label="Destination name" required hint="e.g. St Thomas Aquinas SHS (2–500 characters)">
+                <Input required minLength={2} maxLength={500} value={plan.destinationLocation} onChange={(e) => setPlan((p) => ({ ...p, destinationLocation: e.target.value }))} />
+              </Field>
+            </div>
+
+            <Button type="submit" loading={generating} disabled={!bookingOptions || bookingOptions.length === 0}>Generate route</Button>
           </form>
         </Card>
       )}
