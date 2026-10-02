@@ -99,14 +99,15 @@ export function AuthProvider({ children }) {
   const login = async (email, password, remember = false) => {
     setRememberMe(remember);
     writeLastActive();
-    const data = await AuthApi.login(email, password);
+    const data = await AuthApi.login(email, password, remember);
     if (data?.verificationRequired) return { verificationRequired: true, verification: data.verification };
     return finishLogin(data);
   };
 
-  // The confirm response is exactly a normal login response.
+  // The confirm response is exactly a normal login response. The "Keep me
+  // signed in" choice was saved by login() just before the challenge.
   const completeVerification = async (challengeId, code) => {
-    const data = await AuthApi.confirmVerification(challengeId, code);
+    const data = await AuthApi.confirmVerification(challengeId, code, isRemembered());
     return finishLogin(data);
   };
 

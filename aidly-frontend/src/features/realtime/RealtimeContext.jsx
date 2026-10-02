@@ -80,10 +80,24 @@ export function RealtimeProvider({ children }) {
     };
 
     // Usually an expired access token: a cheap authenticated request makes the
-    // HTTP layer refresh it, and the token change below reconnects.
+    // HTTP layer refresh it, and the token change below reconnects. In a
+    // hidden tab this waits until it's shown again, so an unattended tab
+    // doesn't keep the session alive.
+    const refreshToken = () => http.get('/auth/me', { silent: true }).catch(() => {});
+    let waitingForVisible = false;
+    const onVisible = () => {
+      if (document.hidden) return;
+      document.removeEventListener('visibilitychange', onVisible);
+      waitingForVisible = false;
+      refreshToken();
+    };
     client.onStompError = () => {
       setConnected(false);
-      http.get('/auth/me', { silent: true }).catch(() => {});
+      if (!document.hidden) { refreshToken(); return; }
+      if (!waitingForVisible) {
+        waitingForVisible = true;
+        document.addEventListener('visibilitychange', onVisible);
+      }
     };
 
     client.activate();
@@ -98,6 +112,7 @@ export function RealtimeProvider({ children }) {
 
     return () => {
       unsubscribe();
+      document.removeEventListener('visibilitychange', onVisible);
       client.deactivate();
       setConnected(false);
     };

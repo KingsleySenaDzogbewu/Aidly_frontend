@@ -7,7 +7,8 @@ import { http } from './client';
 // ---------------------------------------------------------------------
 
 export const AuthApi = {
-  login: (email, password) => http.post('/auth/login', { email, password }, { noAuth: true }),
+  // rememberMe ("Keep me signed in") sets how long the server keeps the session: 7 days instead of 12 hours.
+  login: (email, password, rememberMe = false) => http.post('/auth/login', { email, password, rememberMe }, { noAuth: true }),
   me: () => http.get('/auth/me'),
   register: (payload) => http.post('/auth/register', payload),
   adminRegister: (payload) => http.post('/auth/admin/register', payload),
@@ -16,7 +17,7 @@ export const AuthApi = {
   // One-time account verification at a new account's first login. Public:
   // the challengeId from the login response is the credential.
   sendVerification: (challengeId, channel) => http.post('/auth/verification/send', { challengeId, channel }, { noAuth: true }),
-  confirmVerification: (challengeId, code) => http.post('/auth/verification/confirm', { challengeId, code }, { noAuth: true }),
+  confirmVerification: (challengeId, code, rememberMe = false) => http.post('/auth/verification/confirm', { challengeId, code, rememberMe }, { noAuth: true }),
   forgotPassword: (email) => http.post('/auth/forgot-password', { email }, { noAuth: true }),
   resetPassword: (token, newPassword) => http.post('/auth/reset-password', { token, newPassword }, { noAuth: true }),
   deleteMe: () => http.delete('/auth/me'),

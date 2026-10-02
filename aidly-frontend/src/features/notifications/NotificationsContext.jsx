@@ -33,8 +33,15 @@ export function NotificationsProvider({ children }) {
   useEffect(() => {
     if (!isAuthenticated) { setItems([]); return undefined; }
     reload();
-    const t = setInterval(reload, connected ? POLL_MS_LIVE : POLL_MS_FALLBACK);
-    return () => clearInterval(t);
+    // Skipped while the tab is hidden: a background check would refresh the
+    // session and keep an unattended tab signed in.
+    const t = setInterval(() => { if (!document.hidden) reload(); }, connected ? POLL_MS_LIVE : POLL_MS_FALLBACK);
+    const onVisible = () => { if (!document.hidden) reload(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [isAuthenticated, reload, connected]);
 
   useRealtimeEvent('NOTIFICATION_CREATED', (n) => {

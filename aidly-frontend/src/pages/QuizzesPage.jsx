@@ -159,6 +159,21 @@ export default function QuizzesPage() {
     try {
       const res = await QuizApi.submit(selectedQuiz.id, user.studentProfileId, answers);
       setResult(res);
+      // Keep the attempt summary in step without refetching.
+      setSelectedQuiz((q) => {
+        const a = q?.myAttempts;
+        if (!a || !res?.attemptNumber) return q;
+        const total = a.attemptsUsed + a.attemptsRemaining;
+        return {
+          ...q,
+          myAttempts: {
+            attemptsUsed: res.attemptNumber,
+            attemptsRemaining: Math.max(0, total - res.attemptNumber),
+            bestScore: Math.max(a.bestScore ?? 0, res.score ?? 0),
+            passed: a.passed || !!res.passed,
+          },
+        };
+      });
       toast.success('Quiz submitted');
       animateScore(res.score || 0);
     } catch (err) { toast.error(err.message); }
@@ -166,7 +181,10 @@ export default function QuizzesPage() {
   };
 
   const questions = selectedQuiz?.questions || [];
-  const isTaking = isStudent && selectedQuiz?.published && !result && questions.length > 0;
+  // Students get their own attempt summary with the quiz.
+  const attempts = isStudent ? selectedQuiz?.myAttempts : null;
+  const outOfAttempts = attempts?.attemptsRemaining === 0;
+  const isTaking = isStudent && selectedQuiz?.published && !result && questions.length > 0 && !outOfAttempts;
   const curIdx = Math.min(stepIndex, Math.max(0, questions.length - 1));
   const currentQuestion = questions[curIdx];
   const currentOptions = useMemo(() => {
@@ -270,6 +288,19 @@ export default function QuizzesPage() {
                   </div>
                   <Badge>{selectedQuiz.published ? 'Published' : 'Draft'}</Badge>
                 </div>
+
+                {attempts && (
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 10 }}>
+                    Attempts: {attempts.attemptsUsed} of {attempts.attemptsUsed + attempts.attemptsRemaining} used
+                    {attempts.bestScore != null && <> · Best {attempts.bestScore}%</>}
+                    {attempts.passed && <> · <strong style={{ color: 'var(--success)' }}>Passed</strong></>}
+                  </div>
+                )}
+                {outOfAttempts && !result && (
+                  <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--surface-muted)', fontSize: 13 }}>
+                    You’ve used all your attempts for this quiz.
+                  </div>
+                )}
 
                 {canManage && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
@@ -413,6 +444,12 @@ export default function QuizzesPage() {
                       <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
                         Final score: {result.score}% · Attempt #{result.attemptNumber}
                       </div>
+                      {/* Reopening reloads the quiz, which brings the updated attempt count. */}
+                      {attempts && result.attemptNumber < attempts.attemptsUsed + attempts.attemptsRemaining && (
+                        <Button size="sm" variant="outline" style={{ marginTop: 10 }} onClick={() => openQuiz(selectedQuiz.id)}>
+                          Try again
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
