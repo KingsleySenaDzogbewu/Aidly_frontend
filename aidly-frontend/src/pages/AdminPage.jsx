@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
-import { AuthApi, InstructorApi, StudentApi, UserApi, RoleApi } from '../api/endpoints';
+import { AuthApi, InstructorApi, StudentApi, UserApi } from '../api/endpoints';
 import { Avatar, Button, Card, Badge, Field, Input, Select, Tabs, Modal, EmptyState, Icons } from '../components/ui';
 import PhotoField from '../features/photos/PhotoField';
 import PhotoEditor from '../features/photos/PhotoEditor';
@@ -327,25 +327,6 @@ function DirectoryTab({ toast }) {
   );
 }
 
-function RolesTab({ toast }) {
-  const [roles, setRoles] = useState(null);
-  useEffect(() => { RoleApi.list().then(setRoles).catch((err) => toast.error(err.message)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
-
-  if (roles === null) return null;
-  if (roles.length === 0) return <EmptyState title="No roles found" />;
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 420 }}>
-      {roles.map((r) => (
-        <Card key={r.id} tight>
-          <div style={{ fontSize: 13.5, fontWeight: 700 }}>{r.name}</div>
-          {r.description && <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 3 }}>{r.description}</div>}
-        </Card>
-      ))}
-    </div>
-  );
-}
-
 export default function AdminPage() {
   const { isBootstrapAdmin } = useAuth();
   const toast = useToast();
@@ -357,7 +338,6 @@ export default function AdminPage() {
     { value: 'register', label: 'Register user' },
     ...(isBootstrapAdmin ? [{ value: 'directory', label: 'Directory' }] : []),
     { value: 'manage', label: 'Manage accounts' },
-    { value: 'roles', label: 'Roles' },
   ];
 
   // A ?tab= this admin can't see (e.g. "directory" for a regular admin) would
@@ -368,13 +348,12 @@ export default function AdminPage() {
   return (
     <div className="fade-in">
       <h1 className="page-title">Admin</h1>
-      <p className="page-subtitle" style={{ marginBottom: 20 }}>Register accounts and manage roles.</p>
+      <p className="page-subtitle" style={{ marginBottom: 20 }}>Register and manage accounts.</p>
       <Tabs value={tab} onChange={setTab} options={tabOptions} />
       <div style={{ height: 20 }} />
       {tab === 'register' && <RegisterTab toast={toast} />}
       {tab === 'directory' && isBootstrapAdmin && <DirectoryTab toast={toast} />}
       {tab === 'manage' && <ManageTab toast={toast} />}
-      {tab === 'roles' && <RolesTab toast={toast} />}
     </div>
   );
 }

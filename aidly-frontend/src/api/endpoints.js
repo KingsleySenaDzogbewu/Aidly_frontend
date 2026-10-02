@@ -42,10 +42,6 @@ export const SchoolDeletionRequestApi = {
   reject: (id, reviewNotes) => http.post(`/school-deletion-requests/${id}/reject`, reviewNotes ? { reviewNotes } : {}),
 };
 
-export const RoleApi = {
-  list: () => http.get('/roles'),
-};
-
 export const UserApi = {
   remove: (id) => http.delete(`/users/${id}`),
   // Profile photos (JPEG/PNG/WebP, max 5 MB). userId 'me' = the caller. Staff can
