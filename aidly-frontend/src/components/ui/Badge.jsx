@@ -15,6 +15,8 @@ const STATUS_VARIANTS = {
   SENT: '', FAILED: 'danger',
   // driving assessment result
   PASSED: '', NEEDS_IMPROVEMENT: 'warning',
+  // attendance
+  PRESENT: '', PENDING_CONFIRMATION: 'warning', LATE: 'info', ABSENT: 'danger', NOT_CHECKED_IN: 'neutral',
 };
 
 export default function Badge({ children, variant, status, className = '' }) {

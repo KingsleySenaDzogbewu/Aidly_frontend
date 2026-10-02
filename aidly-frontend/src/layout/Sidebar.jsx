@@ -17,6 +17,8 @@ const NAV = [
   { to: '/announcements', label: 'Announcements', icon: Icons.IconMegaphone },
   { to: '/notifications', label: 'Notifications', icon: Icons.IconBell, badge: 'notifications' },
   { to: '/bookings', label: 'Bookings', icon: Icons.IconCalendar },
+  // Kept per school - the bootstrap admin has none.
+  { to: '/attendance', label: 'Attendance', icon: Icons.IconCalendarCheck, schoolOnly: true },
   { to: '/routes', label: 'Routes & progress', icon: Icons.IconRoute },
   { to: '/leaderboard', label: 'Leaderboard', icon: Icons.IconTrophy },
   { to: '/profile', label: 'Profile', icon: Icons.IconUser },
@@ -70,7 +72,7 @@ export default function Sidebar({ mobile, open, onNavigate, onClose }) {
       </div>
 
       <div className="nav-group">
-        {NAV.filter((item) => !item.messagesOnly || canMessage).map((item) => (
+        {NAV.filter((item) => (!item.messagesOnly || canMessage) && (!item.schoolOnly || !isBootstrapAdmin)).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

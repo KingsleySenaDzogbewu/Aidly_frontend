@@ -32,6 +32,8 @@ export const SchoolApi = {
   remove: (id) => http.delete(`/schools/${id}`),
   // Regular admin: requests deletion of their own school (approval-gated, not immediate).
   requestOwnDeletion: () => http.delete('/schools/me'),
+  // Regular admin: their school's attendance location { latitude, longitude, attendanceRadiusMeters?, timeZone? }.
+  setMyLocation: (payload) => http.put('/schools/me/location', payload),
 };
 
 export const SchoolDeletionRequestApi = {
@@ -213,6 +215,25 @@ export const LiveSessionApi = {
   unregister: (id) => http.delete(`/live-sessions/${id}/register`),
   markPresent: (id, studentId) => http.put(`/live-sessions/${id}/attendance/${studentId}/present`),
   attendance: (id) => http.get(`/live-sessions/${id}/attendance`),
+};
+
+// Daily attendance. Dates are plain 'YYYY-MM-DD' in the school's time zone.
+export const AttendanceApi = {
+  // Student/instructor: { latitude, longitude, accuracyMeters, lessonType?, topic? }.
+  checkIn: (payload) => http.post('/attendance/check-in', payload),
+  // Own history, newest first (default last 30 days, at most 62).
+  mine: (params) => http.get('/attendance/me', { params }),
+  userHistory: (userId, params) => http.get(`/attendance/users/${userId}`, { params }),
+  // One day for the whole school: { date?, role?: 'STUDENT' | 'INSTRUCTOR' }.
+  day: (schoolId, params) => http.get(`/attendance/school/${schoolId}`, { params }),
+  confirm: (attendanceId) => http.put(`/attendance/${attendanceId}/confirm`),
+  // { userId, date, status: PRESENT | LATE | ABSENT, reason? }
+  manual: (payload) => http.post('/attendance/manual', payload),
+  // { date, role, entries: [{ userId, status, reason? }] }
+  rollCall: (schoolId, payload) => http.put(`/attendance/school/${schoolId}/roll-call`, payload),
+  // Excel files - fetched with the token as blobs.
+  exportDay: (schoolId, params) => http.get(`/attendance/school/${schoolId}/export/day`, { params, responseType: 'blob' }),
+  exportRegister: (schoolId, params) => http.get(`/attendance/school/${schoolId}/export/register`, { params, responseType: 'blob' }),
 };
 
 export const LicenseWorkflowApi = {

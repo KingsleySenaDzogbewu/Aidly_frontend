@@ -51,6 +51,7 @@ const MessagesPage = lazyPage(() => import('./pages/MessagesPage'));
 const AnnouncementsPage = lazyPage(() => import('./pages/AnnouncementsPage'));
 const NotFoundPage = lazyPage(() => import('./pages/NotFoundPage'));
 const RoutesProgressPage = lazyPage(() => import('./pages/RoutesProgressPage'));
+const AttendancePage = lazyPage(() => import('./pages/AttendancePage'));
 
 function AuthedApp() {
   return (
@@ -91,6 +92,7 @@ export default function App() {
                 />
                 <Route path="announcements" element={<AnnouncementsPage />} />
                 <Route path="bookings" element={<BookingsPage />} />
+                <Route path="attendance" element={<AttendancePage />} />
                 <Route path="routes" element={<RoutesProgressPage />} />
                 <Route path="leaderboard" element={<LeaderboardPage />} />
                 <Route path="profile" element={<ProfilePage />} />

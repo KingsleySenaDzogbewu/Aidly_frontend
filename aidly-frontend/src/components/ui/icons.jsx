@@ -22,6 +22,8 @@ export const IconQuiz = (p) => <Icon {...p}><path d="M9 11.5a3 3 0 1 1 3.6 2.94c
 export const IconNotes = (p) => <Icon {...p}><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /><path d="M14 3v5h5" /><path d="M8 13h8M8 16.5h5" /></Icon>;
 export const IconBell = (p) => <Icon {...p}><path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" /><path d="M10 19.5a2 2 0 0 0 4 0" /></Icon>;
 export const IconCalendar = (p) => <Icon {...p}><rect x="3.5" y="5" width="17" height="16" rx="2.2" /><path d="M8 3v4M16 3v4M3.5 10h17" /></Icon>;
+export const IconCalendarCheck = (p) => <Icon {...p}><rect x="3.5" y="5" width="17" height="16" rx="2.2" /><path d="M8 3v4M16 3v4M3.5 10h17" /><path d="m9 15.2 2 2 4-4.2" /></Icon>;
+export const IconPin = (p) => <Icon {...p}><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" /><circle cx="12" cy="10" r="2.4" /></Icon>;
 export const IconRoute = (p) => <Icon {...p}><circle cx="6" cy="19" r="2.2" /><circle cx="18" cy="5" r="2.2" /><path d="M6 16.8V13a4 4 0 0 1 4-4h2a4 4 0 0 0 4-4v-.2" strokeDasharray="2.5 3.5" /></Icon>;
 export const IconUser = (p) => <Icon {...p}><circle cx="12" cy="8" r="3.6" /><path d="M4.5 20a7.5 7.5 0 0 1 15 0" /></Icon>;
 export const IconSchool = (p) => <Icon {...p}><path d="m12 3 9.5 5-9.5 5-9.5-5Z" /><path d="M6.5 10.7V16c0 1.5 2.46 3 5.5 3s5.5-1.5 5.5-3v-5.3" /><path d="M21.5 8v6" /></Icon>;
