@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useMessages } from '../features/messages/MessagesContext';
+import { useRealtime, useRealtimeEvent } from '../features/realtime/RealtimeContext';
 import { ConversationApi } from '../api/endpoints';
 import { Button, Input, Modal, SkeletonList, EmptyState, Icons, useToast } from '../components/ui';
 import useIsMobile from '../hooks/useIsMobile';
@@ -9,7 +10,10 @@ import { fmtDayLabel, fmtShortWhen, fmtTime, humanize, initials, toDate } from '
 import './messages.css';
 
 const PAGE_SIZE = 30;
-const THREAD_POLL_MS = 10000;
+// New messages are pushed instantly; this check is the backup (frequent if the
+// realtime connection is down).
+const THREAD_POLL_MS_LIVE = 60000;
+const THREAD_POLL_MS_FALLBACK = 10000;
 const MAX_LENGTH = 5000;
 
 const nameParts = (name = '') => { const [first, ...rest] = name.split(' '); return [first, rest.join(' ')]; };
@@ -29,6 +33,7 @@ function mergeMessages(prev, incoming) {
 function Thread({ conversation, isMobile, onBack }) {
   const toast = useToast();
   const { reload: reloadInbox, markReadLocally } = useMessages();
+  const { connected } = useRealtime();
   const [messages, setMessages] = useState(null);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -46,7 +51,16 @@ function Thread({ conversation, isMobile, onBack }) {
     ConversationApi.markRead(id, { silent: true }).then(() => markReadLocally(id)).catch(() => {});
   };
 
-  // First page, then poll for new messages / read receipts while open.
+  // Fetches the newest page and merges it in (also used to catch up after a reconnect).
+  const refreshLatest = async () => {
+    const res = await ConversationApi.messages(id, { page: 0, size: PAGE_SIZE }, { silent: true });
+    const known = new Set(messagesRef.current.map((m) => m.id));
+    const gotNewFromThem = (res?.content || []).some((m) => !m.mine && !known.has(m.id));
+    setMessages((prev) => mergeMessages(prev, res?.content || []));
+    if (gotNewFromThem) markRead();
+  };
+
+  // First page when the conversation opens.
   useEffect(() => {
     let cancelled = false;
     ConversationApi.messages(id, { page: 0, size: PAGE_SIZE })
@@ -57,21 +71,32 @@ function Thread({ conversation, isMobile, onBack }) {
         markRead();
       })
       .catch((err) => { if (!cancelled) { setMessages([]); toast.error(err.message); } });
-
-    const poll = setInterval(async () => {
-      if (document.hidden) return;
-      try {
-        const res = await ConversationApi.messages(id, { page: 0, size: PAGE_SIZE }, { silent: true });
-        const known = new Set(messagesRef.current.map((m) => m.id));
-        const gotNewFromThem = (res?.content || []).some((m) => !m.mine && !known.has(m.id));
-        setMessages((prev) => mergeMessages(prev, res?.content || []));
-        if (gotNewFromThem) markRead();
-      } catch { /* next poll will retry */ }
-    }, THREAD_POLL_MS);
-
-    return () => { cancelled = true; clearInterval(poll); };
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Backup check while open: rare when the realtime connection is up, frequent when it isn't.
+  useEffect(() => {
+    const poll = setInterval(() => {
+      if (!document.hidden) refreshLatest().catch(() => { /* next check will retry */ });
+    }, connected ? THREAD_POLL_MS_LIVE : THREAD_POLL_MS_FALLBACK);
+    return () => clearInterval(poll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, connected]);
+
+  // Pushed instantly: a new message in this conversation (from them, or from me on another device)…
+  useRealtimeEvent('MESSAGE_CREATED', (m) => {
+    if (m?.conversationId !== id) return;
+    setMessages((prev) => mergeMessages(prev, [m]));
+    if (!m.mine) markRead();
+  });
+  // …and the other person reading my messages ("Seen").
+  useRealtimeEvent('CONVERSATION_READ', (e) => {
+    if (e?.conversationId !== id || !e.readAt) return;
+    const readAt = toDate(e.readAt);
+    setMessages((prev) => (prev || []).map((m) => (m.mine && !m.readAt && !m.pending && toDate(m.sentAt) <= readAt ? { ...m, readAt: e.readAt } : m)));
+  });
+  useRealtimeEvent('RECONNECTED', () => { refreshLatest().catch(() => {}); });
 
   // Keep the view pinned to the newest message unless the reader scrolled up;
   // keep their place when older messages are added above.

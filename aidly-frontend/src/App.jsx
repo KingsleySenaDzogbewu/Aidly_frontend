@@ -4,6 +4,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute, RequireRole } from './auth/ProtectedRoute';
 import { NotificationsProvider } from './features/notifications/NotificationsContext';
 import { MessagesProvider } from './features/messages/MessagesContext';
+import { RealtimeProvider } from './features/realtime/RealtimeContext';
 import { ToastProvider } from './components/ui';
 import FloatingFeedbackButton from './components/FloatingFeedbackButton';
 import AppShell from './layout/AppShell';
@@ -32,11 +33,13 @@ const RoutesProgressPage = lazy(() => import('./pages/RoutesProgressPage'));
 
 function AuthedApp() {
   return (
-    <NotificationsProvider>
-      <MessagesProvider>
-        <AppShell />
-      </MessagesProvider>
-    </NotificationsProvider>
+    <RealtimeProvider>
+      <NotificationsProvider>
+        <MessagesProvider>
+          <AppShell />
+        </MessagesProvider>
+      </NotificationsProvider>
+    </RealtimeProvider>
   );
 }
 

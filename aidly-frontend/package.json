@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@sentry/react": "^10.69.0",
+    "@stomp/stompjs": "^7.3.0",
     "axios": "^1.18.1",
     "leaflet": "^1.9.4",
     "react": "^19.2.7",

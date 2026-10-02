@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { AnnouncementApi } from '../api/endpoints';
+import { useRealtimeEvent } from '../features/realtime/RealtimeContext';
 import { Button, Card, Field, Input, Textarea, LengthHint, Modal, SkeletonList, EmptyState, Icons, Reveal, useToast } from '../components/ui';
 import { fmtDateTime } from '../utils/format';
 
@@ -34,6 +35,13 @@ export default function AnnouncementsPage() {
     load(0).catch((err) => { setItems([]); toast.error(err.message); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pushed instantly when an instructor of the school posts one.
+  useRealtimeEvent('ANNOUNCEMENT_CREATED', (a) => {
+    if (!a?.id) return;
+    setItems((prev) => ((prev || []).some((x) => x.id === a.id) ? prev : [a, ...(prev || [])]));
+  });
+  useRealtimeEvent('RECONNECTED', () => { load(0).catch(() => {}); });
 
   const loadMore = async () => {
     setLoadingMore(true);

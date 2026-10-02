@@ -1,11 +1,18 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { NotificationApi } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
+import { useRealtime, useRealtimeEvent } from '../realtime/RealtimeContext';
 
 const NotificationsContext = createContext(null);
 
+// New notifications are pushed instantly over the realtime connection; the
+// timed check is only a backup (frequent if that connection is down).
+const POLL_MS_LIVE = 300000;
+const POLL_MS_FALLBACK = 60000;
+
 export function NotificationsProvider({ children }) {
   const { isAuthenticated } = useAuth();
+  const { connected } = useRealtime();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -24,11 +31,17 @@ export function NotificationsProvider({ children }) {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (!isAuthenticated) { setItems([]); return; }
+    if (!isAuthenticated) { setItems([]); return undefined; }
     reload();
-    const t = setInterval(reload, 60000);
+    const t = setInterval(reload, connected ? POLL_MS_LIVE : POLL_MS_FALLBACK);
     return () => clearInterval(t);
-  }, [isAuthenticated, reload]);
+  }, [isAuthenticated, reload, connected]);
+
+  useRealtimeEvent('NOTIFICATION_CREATED', (n) => {
+    if (!n?.id) return;
+    setItems((prev) => (prev.some((x) => x.id === n.id) ? prev : [n, ...prev]));
+  });
+  useRealtimeEvent('RECONNECTED', reload);
 
   const markRead = useCallback(async (id) => {
     await NotificationApi.markRead(id);
