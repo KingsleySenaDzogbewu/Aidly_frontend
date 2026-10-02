@@ -3,15 +3,19 @@ import { NavLink } from 'react-router-dom';
 import * as Sentry from '@sentry/react';
 import { useAuth } from '../auth/AuthContext';
 import { useNotifications } from '../features/notifications/NotificationsContext';
+import { useMessages } from '../features/messages/MessagesContext';
 import { Icons } from '../components/ui';
 
+// badge: which unread count to show; messagesOnly: students/instructors only (admins don't message).
 const NAV = [
   { to: '/', label: 'Overview', icon: Icons.IconHome, end: true },
   { to: '/live', label: 'Live sessions', icon: Icons.IconVideo },
   { to: '/courses', label: 'Courses & lessons', icon: Icons.IconBook },
   { to: '/quizzes', label: 'Quizzes', icon: Icons.IconQuiz },
   { to: '/notes', label: 'Notes & questions', icon: Icons.IconNotes },
-  { to: '/notifications', label: 'Notifications', icon: Icons.IconBell, badge: true },
+  { to: '/messages', label: 'Messages', icon: Icons.IconChat, badge: 'messages', messagesOnly: true },
+  { to: '/announcements', label: 'Announcements', icon: Icons.IconMegaphone },
+  { to: '/notifications', label: 'Notifications', icon: Icons.IconBell, badge: 'notifications' },
   { to: '/bookings', label: 'Bookings', icon: Icons.IconCalendar },
   { to: '/routes', label: 'Routes & progress', icon: Icons.IconRoute },
   { to: '/leaderboard', label: 'Leaderboard', icon: Icons.IconTrophy },
@@ -32,6 +36,8 @@ const INSTRUCTOR_NAV = [
 export default function Sidebar({ mobile, open, onNavigate, onClose }) {
   const { user, isAdmin, isInstructor, isBootstrapAdmin, roles, logout } = useAuth();
   const { unreadCount } = useNotifications();
+  const { enabled: canMessage, unreadTotal: unreadMessages } = useMessages();
+  const badgeCount = (item) => (item.badge === 'notifications' ? unreadCount : item.badge === 'messages' ? unreadMessages : 0);
 
   const classes = ['sidebar', mobile ? 'mobile' : '', mobile && open ? 'open' : ''].filter(Boolean).join(' ');
 
@@ -64,7 +70,7 @@ export default function Sidebar({ mobile, open, onNavigate, onClose }) {
       </div>
 
       <div className="nav-group">
-        {NAV.map((item) => (
+        {NAV.filter((item) => !item.messagesOnly || canMessage).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -72,11 +78,11 @@ export default function Sidebar({ mobile, open, onNavigate, onClose }) {
             onClick={onNavigate}
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
           >
-            <span className={item.badge && unreadCount > 0 ? 'nav-bell-shake' : ''}>
+            <span className={item.badge === 'notifications' && unreadCount > 0 ? 'nav-bell-shake' : ''}>
               <item.icon size={16} />
             </span>
             {item.label}
-            {item.badge && unreadCount > 0 && <span className="nav-badge">{unreadCount}</span>}
+            {badgeCount(item) > 0 && <span className="nav-badge">{badgeCount(item)}</span>}
           </NavLink>
         ))}
 

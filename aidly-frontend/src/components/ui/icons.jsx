@@ -39,6 +39,8 @@ export const IconChevronRight = (p) => <Icon {...p}><path d="m9 6 6 6-6 6" /></I
 export const IconChevronDown = (p) => <Icon {...p}><path d="m6 9 6 6 6-6" /></Icon>;
 export const IconTrash = (p) => <Icon {...p}><path d="M4 7h16M9.5 7V4.8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7M6.5 7l.7 12a1.6 1.6 0 0 0 1.6 1.5h6.4a1.6 1.6 0 0 0 1.6-1.5l.7-12" /></Icon>;
 export const IconSearch = (p) => <Icon {...p}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></Icon>;
+export const IconChat = (p) => <Icon {...p}><path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5Z" /><path d="M8 10h8M8 13h5" /></Icon>;
+export const IconMegaphone = (p) => <Icon {...p}><path d="M4 10v4a1 1 0 0 0 1 1h2l8 4.5v-15L7 9H5a1 1 0 0 0-1 1Z" /><path d="M7 15l1.5 4.5h2.5L9.8 15.6" /><path d="M18.5 9.5a3.5 3.5 0 0 1 0 5" /></Icon>;
 export const IconInbox = (p) => <Icon {...p}><path d="M4 12h4.2l1.4 3h4.8l1.4-3H20" /><path d="M5.5 5h13l1.5 7v6a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 18v-6Z" /></Icon>;
 export const IconFile = (p) => <Icon {...p}><path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /><path d="M14 3v4h4" /></Icon>;
 export const IconDownload = (p) => <Icon {...p}><path d="M12 4v11m0 0-4-4m4 4 4-4" /><path d="M5 18.5h14" /></Icon>;

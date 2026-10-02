@@ -181,9 +181,25 @@ export const LessonQuestionApi = {
   historyPaginated: (id, params) => http.get(`/lesson-questions/${id}/history/paginated`, { params }),
 };
 
+// Private student <-> instructor messaging (admins don't take part).
+// `opts` lets background polling pass { silent: true } so it doesn't drive the progress bar.
 export const ConversationApi = {
   // Student caller: their school's ACTIVE instructors; instructor caller: their school's students.
   contacts: () => http.get('/conversations/contacts'),
+  // Inbox, most recent activity first.
+  list: (opts) => http.get('/conversations', opts),
+  // Opens (or returns the existing) conversation with the other person's PROFILE id.
+  open: (participantProfileId) => http.post('/conversations', { participantProfileId }),
+  // Newest first, paginated (50 per page by default).
+  messages: (conversationId, params, opts) => http.get(`/conversations/${conversationId}/messages`, { params, ...opts }),
+  send: (conversationId, body) => http.post(`/conversations/${conversationId}/messages`, { body }),
+  markRead: (conversationId, opts) => http.post(`/conversations/${conversationId}/read`, null, opts),
+};
+
+// One-way announcements from an instructor to every student of their school.
+export const AnnouncementApi = {
+  list: (params) => http.get('/announcements', { params }),
+  create: (subject, body) => http.post('/announcements', { subject, body }),
 };
 
 export const LiveSessionApi = {

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute, RequireRole } from './auth/ProtectedRoute';
 import { NotificationsProvider } from './features/notifications/NotificationsContext';
+import { MessagesProvider } from './features/messages/MessagesContext';
 import { ToastProvider } from './components/ui';
 import FloatingFeedbackButton from './components/FloatingFeedbackButton';
 import AppShell from './layout/AppShell';
@@ -22,6 +23,8 @@ import AdminPage from './pages/AdminPage';
 import CreateStudentPage from './pages/CreateStudentPage';
 import SendNotificationPage from './pages/SendNotificationPage';
 import LeaderboardPage from './pages/LeaderboardPage';
+import MessagesPage from './pages/MessagesPage';
+import AnnouncementsPage from './pages/AnnouncementsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Pulls in Leaflet (the heaviest dependency) — split into its own chunk.
@@ -30,7 +33,9 @@ const RoutesProgressPage = lazy(() => import('./pages/RoutesProgressPage'));
 function AuthedApp() {
   return (
     <NotificationsProvider>
-      <AppShell />
+      <MessagesProvider>
+        <AppShell />
+      </MessagesProvider>
     </NotificationsProvider>
   );
 }
@@ -53,6 +58,11 @@ export default function App() {
                 <Route path="quizzes" element={<QuizzesPage />} />
                 <Route path="notes" element={<NotesQuestionsPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
+                <Route
+                  path="messages"
+                  element={<RequireRole roles={['STUDENT', 'INSTRUCTOR']}><MessagesPage /></RequireRole>}
+                />
+                <Route path="announcements" element={<AnnouncementsPage />} />
                 <Route path="bookings" element={<BookingsPage />} />
                 <Route path="routes" element={<Suspense fallback={null}><RoutesProgressPage /></Suspense>} />
                 <Route path="leaderboard" element={<LeaderboardPage />} />

@@ -3,9 +3,16 @@ import { useNotifications } from '../features/notifications/NotificationsContext
 import { Button, Card, SkeletonList, EmptyState, Icons, Reveal, useToast } from '../components/ui';
 import { fmtDateTime } from '../utils/format';
 
-// "New question from …" (to instructors) / answered-question notices (to
-// students) - the question itself lives on Notes & questions, so link there.
-const isQuestionNotification = (n) => /question/i.test(n.subject || '');
+// Notifications that point at something elsewhere in the app get a button to
+// open it (matched on the backend's subject wording).
+function notificationLink(n) {
+  const subject = n.subject || '';
+  if (/^new message from/i.test(subject)) return { to: '/messages', label: 'View message' };
+  if (/^announcement from/i.test(subject)) return { to: '/announcements', label: 'View announcement' };
+  // "New question from …" (instructors) / answered-question notices (students).
+  if (/question/i.test(subject)) return { to: '/notes?tab=questions', label: 'View question' };
+  return null;
+}
 
 export default function NotificationsPage() {
   const { items, loading, markRead } = useNotifications();
@@ -14,9 +21,9 @@ export default function NotificationsPage() {
   const markAsRead = (n) => markRead(n.id).catch((err) => toast.error(err.message || 'Couldn’t mark this notification as read. Please try again.'));
   const navigate = useNavigate();
 
-  const viewQuestion = (n) => {
+  const open = (n, to) => {
     if (!n.readAt) markRead(n.id).catch(() => {});
-    navigate('/notes?tab=questions');
+    navigate(to);
   };
 
   return (
@@ -49,8 +56,8 @@ export default function NotificationsPage() {
                       <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>{n.channel} · {fmtDateTime(n.sentAt)}</div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flex: '0 0 auto', flexWrap: 'wrap' }}>
-                      {isQuestionNotification(n) && (
-                        <Button size="sm" onClick={() => viewQuestion(n)}>View question</Button>
+                      {notificationLink(n) && (
+                        <Button size="sm" onClick={() => open(n, notificationLink(n).to)}>{notificationLink(n).label}</Button>
                       )}
                       {unread && (
                         <Button size="sm" variant="outline" onClick={() => markAsRead(n)}>

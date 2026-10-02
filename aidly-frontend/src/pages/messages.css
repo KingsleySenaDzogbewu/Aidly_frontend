@@ -1,0 +1,85 @@
+/* ---------- Messages ---------- */
+.msg-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+.msg-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: min(72vh, 680px);
+  overflow: hidden;
+}
+.msg-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+}
+.msg-panel-title { font-size: 15px; font-weight: 700; min-width: 0; }
+.msg-panel-sub { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+/* Inbox */
+.msg-inbox { overflow-y: auto; flex: 1; }
+.msg-row {
+  display: flex; gap: 12px; align-items: center; width: 100%;
+  padding: 12px 16px; border: none; border-bottom: 1px solid var(--border);
+  background: transparent; text-align: left; cursor: pointer;
+  transition: background 0.15s ease;
+}
+.msg-row:hover { background: var(--surface-muted); }
+.msg-row.active { background: var(--accent-soft-bg); }
+.msg-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.msg-row-main { flex: 1; min-width: 0; }
+.msg-row-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.msg-row-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-row.unread .msg-row-name { font-weight: 800; }
+.msg-row-time { font-size: 11.5px; color: var(--text-faint); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.msg-row-preview { font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.msg-row.unread .msg-row-preview { color: var(--text); font-weight: 600; }
+.msg-unread {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 100px;
+  background: var(--accent); color: var(--text-on-accent);
+  font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+}
+.msg-avatar { width: 36px; height: 36px; font-size: 13px; flex-shrink: 0; }
+
+/* Thread */
+.msg-thread { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+.msg-day { align-self: center; font-size: 11.5px; font-weight: 600; color: var(--text-muted); background: var(--surface-muted); padding: 3px 10px; border-radius: 100px; margin: 10px 0 4px; }
+.msg-bubble-row { display: flex; flex-direction: column; max-width: min(78%, 520px); }
+.msg-bubble-row.mine { align-self: flex-end; align-items: flex-end; }
+.msg-bubble-row.theirs { align-self: flex-start; align-items: flex-start; }
+.msg-bubble {
+  padding: 8px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.mine .msg-bubble { background: var(--accent); color: var(--text-on-accent); border-bottom-right-radius: 4px; }
+.theirs .msg-bubble { background: var(--surface-muted); color: var(--text); border-bottom-left-radius: 4px; }
+.msg-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.msg-meta.failed { color: var(--danger); }
+.msg-pending .msg-bubble { opacity: 0.6; }
+
+/* Composer */
+.msg-composer { border-top: 1px solid var(--border); padding: 10px 12px; display: flex; gap: 8px; align-items: flex-end; }
+.msg-composer textarea { flex: 1 1 auto; min-width: 0; min-height: 44px; resize: none; max-height: 140px; }
+/* The phone rule that makes form submit buttons full-width doesn't suit a chat box. */
+.msg-composer button[type='submit'].btn { width: auto; flex: 0 0 auto; }
+.msg-composer-hint { font-size: 11px; color: var(--text-faint); padding: 0 14px 8px; }
+
+.msg-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; text-align: center; color: var(--text-muted); font-size: 13.5px; }
+
+/* Contacts picker */
+.msg-contacts { display: flex; flex-direction: column; max-height: 50vh; overflow-y: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; }
+.msg-contacts .msg-row:last-child { border-bottom: none; }
+
+@media (max-width: 900px) {
+  .msg-layout { grid-template-columns: 1fr; }
+  .msg-panel { height: calc(100dvh - 250px); min-height: 360px; }
+  /* Open conversation on a phone: fill the screen below the app's top bar. */
+  .msg-panel.msg-panel-fullscreen { height: calc(100dvh - 110px - env(safe-area-inset-bottom, 0px)); }
+  .msg-bubble-row { max-width: 86%; }
+}

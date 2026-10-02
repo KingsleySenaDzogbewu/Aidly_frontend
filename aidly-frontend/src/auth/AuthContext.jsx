@@ -14,7 +14,7 @@ async function withProfileName(me) {
     const profile = roles.includes('INSTRUCTOR') ? await InstructorApi.me()
       : roles.includes('STUDENT') ? await StudentApi.me()
         : null;
-    return profile ? { ...me, firstName: profile.firstName, lastName: profile.lastName } : me;
+    return profile ? { ...me, firstName: profile.firstName, lastName: profile.lastName, schoolName: profile.schoolName } : me;
   } catch {
     return me;
   }
