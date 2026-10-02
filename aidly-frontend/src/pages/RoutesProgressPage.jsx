@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { LessonRouteApi, LicenseWorkflowApi, DrivingAssessmentApi, BookingApi, LICENSE_STAGES } from '../api/endpoints';
-import { Button, Card, Badge, Field, Input, Select, Textarea, Tabs, EmptyState, SkeletonList, Icons, Reveal } from '../components/ui';
+import { Button, Card, Badge, Field, Input, Select, Textarea, Tabs, EmptyState, SkeletonList, Icons, Reveal, StudentPicker } from '../components/ui';
 import RouteMap from '../features/routes/RouteMap';
 import { START_COLOR, DESTINATION_COLOR } from '../features/routes/pins';
 import RoutePointsPicker from '../features/routes/RoutePointsPicker';
@@ -24,25 +24,6 @@ const STAGE_COLORS = [
   'var(--hue-green)', 'var(--hue-violet)', 'var(--hue-teal)', 'var(--hue-green)',
 ];
 
-function RouteResultCard({ route }) {
-  if (!route) return null;
-  return (
-    <Card tight style={{ marginBottom: 14, overflow: 'hidden' }}>
-      <div style={{ fontSize: 14.5, fontWeight: 700 }}>{route.startLocation} → {route.destinationLocation}</div>
-      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-        {route.distanceKm} km · {route.durationMinutes} min{route.instructorName ? ` · Instructor: ${route.instructorName}` : ''}
-      </div>
-      <div style={{ marginTop: 14 }}>
-        <RouteMap
-          start={{ lat: route.startLatitude, lng: route.startLongitude, label: route.startLocation }}
-          destination={{ lat: route.destinationLatitude, lng: route.destinationLongitude, label: route.destinationLocation }}
-          path={route.coordinates}
-        />
-      </div>
-    </Card>
-  );
-}
-
 function TheoryRing({ percent }) {
   const display = useCountUp(percent);
   return (
@@ -59,7 +40,7 @@ function TheoryRing({ percent }) {
 }
 
 function LessonRoutesTab() {
-  const { user, isInstructor, isStudent } = useAuth();
+  const { user, isAdmin, isInstructor, isStudent } = useAuth();
   const toast = useToast();
   const [searchParams] = useSearchParams();
 
@@ -73,13 +54,14 @@ function LessonRoutesTab() {
   const [focusPoint, setFocusPoint] = useState(null);
   const [bookingOptions, setBookingOptions] = useState(null); // null = loading
   const [generating, setGenerating] = useState(false);
-  const [lookupBookingId, setLookupBookingId] = useState('');
-  const [lookupResult, setLookupResult] = useState(null);
+  // bookingId -> that lesson (student, instructor, time), to name each route's lesson.
+  const [lessons, setLessons] = useState({});
   // ?route=<id> (from a booking's "View route") opens that route's map straight away.
   const [expandedId, setExpandedId] = useState(() => Number(searchParams.get('route')) || null);
 
-  // Instructors see the routes they've planned; students see the routes for their own bookings.
-  const hasOwnList = isInstructor || isStudent;
+  // Instructors see the routes they've planned; students the routes for their own
+  // lessons; a school admin every route in the school.
+  const hasOwnList = isInstructor || isStudent || isAdmin;
 
   const loadMine = async () => {
     if (isInstructor && !user?.instructorProfileId) return;
@@ -87,11 +69,30 @@ function LessonRoutesTab() {
     setLoadingRoutes(true);
     try {
       const res = isInstructor
-        ? await LessonRouteApi.listByInstructor(user.instructorProfileId)
-        : await LessonRouteApi.mine();
-      setRoutes(res?.content || res || []);
+        ? await LessonRouteApi.listByInstructor(user.instructorProfileId, { size: 100 })
+        : isStudent
+          ? await LessonRouteApi.mine({ size: 100 })
+          : await LessonRouteApi.listAll({ size: 100 });
+      const list = res?.content || res || [];
+      setRoutes(list);
+      // Routes only carry a booking ID - fetch those lessons for names and times.
+      const ids = [...new Set(list.map((r) => r.bookingId).filter(Boolean))];
+      const found = await Promise.all(ids.map((id) => BookingApi.get(id).catch(() => null)));
+      const map = {};
+      found.forEach((b) => { if (b?.id != null) map[b.id] = b; });
+      setLessons(map);
     } catch (err) { toast.error(err.message); }
     finally { setLoadingRoutes(false); }
+  };
+
+  // "Ransford Adi · Oct 30, 1:34 PM", worded for whoever is looking.
+  const lessonLabel = (r) => {
+    const b = lessons[r.bookingId];
+    if (!b) return r.instructorName ? `Instructor: ${r.instructorName}` : 'Lesson';
+    const when = fmtDateTime(b.scheduledAt);
+    if (isStudent) return `${when} · with ${b.instructorName || r.instructorName}`;
+    if (isInstructor) return `${b.studentName} · ${when}`;
+    return `${b.studentName} with ${b.instructorName || r.instructorName} · ${when}`;
   };
   useEffect(() => { loadMine(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user]);
 
@@ -182,12 +183,6 @@ function LessonRoutesTab() {
         toast.error(msg);
       }
     } finally { setGenerating(false); }
-  };
-
-  const lookup = async () => {
-    if (!lookupBookingId) return;
-    try { setLookupResult(await LessonRouteApi.getByBooking(lookupBookingId)); }
-    catch (err) { toast.error(err.message); }
   };
 
   return (
@@ -308,16 +303,11 @@ function LessonRoutesTab() {
         </Card>
       )}
 
-      {/* Students get their own list below, so they don't need to know booking IDs. */}
-      {!isStudent && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
-          <Input placeholder="Look up route by booking ID" value={lookupBookingId} onChange={(e) => setLookupBookingId(e.target.value)} style={{ maxWidth: 240, flex: '1 1 200px' }} />
-          <Button variant="outline" onClick={lookup}>Look up</Button>
-        </div>
+      {isAdmin && (
+        <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
+          Every lesson route planned by your school&rsquo;s instructors.
+        </p>
       )}
-
-      <RouteResultCard route={lookupResult} />
-
       {isStudent && (
         <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
           The roads you&rsquo;ll drive on in your practical lessons, planned by your instructor.
@@ -328,7 +318,8 @@ function LessonRoutesTab() {
         <SkeletonList count={2} small />
       ) : routes.length === 0 ? (
         <EmptyState icon={<Icons.IconMap size={22} />} title="No routes yet">
-          {isStudent ? 'When your instructor plans a route for one of your lessons, it appears here.' : null}
+          {isStudent ? 'When your instructor plans a route for one of your lessons, it appears here.'
+            : isAdmin ? 'When an instructor plans a route for a lesson, it appears here.' : null}
         </EmptyState>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -338,7 +329,7 @@ function LessonRoutesTab() {
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{r.startLocation} → {r.destinationLocation}</div>
                   <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                    {r.distanceKm} km · {r.durationMinutes} min · Booking #{r.bookingId}{isStudent && r.instructorName ? ` · ${r.instructorName}` : ''}
+                    {lessonLabel(r)} · {r.distanceKm} km · {r.durationMinutes} min
                   </div>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
@@ -442,10 +433,19 @@ function LicenseProgressTab() {
   return (
     <div>
       {(isAdmin || isInstructor) && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-          <Input placeholder="Student profile ID" value={lookupStudentId} onChange={(e) => setLookupStudentId(e.target.value)} style={{ width: 170 }} />
-          <Button variant="outline" onClick={() => load(lookupStudentId)}>Load</Button>
+        <div style={{ maxWidth: 320, marginBottom: 16 }}>
+          <StudentPicker
+            schoolId={user?.schoolId}
+            label="Student"
+            value={lookupStudentId}
+            onChange={(id) => { setLookupStudentId(id); setWorkflow(null); setNotStarted(false); if (id) load(id); }}
+          />
         </div>
+      )}
+      {(isAdmin || isInstructor) && !lookupStudentId && (
+        <EmptyState icon={<Icons.IconShield size={22} />} title="Choose a student">
+          Pick a student above to see where they are on the way to their license.
+        </EmptyState>
       )}
 
       {!workflow && notStarted ? (
@@ -461,7 +461,7 @@ function LicenseProgressTab() {
         </EmptyState>
       ) : !workflow ? (
         <EmptyState icon={<Icons.IconShield size={22} />} title="No license progress loaded yet">
-          {!isStudent && 'Enter a student profile ID above and click Load.'}
+          {!isStudent && 'Choose a student above.'}
         </EmptyState>
       ) : (
         <Card className="fade-in-up" style={{ maxWidth: 720 }}>
@@ -611,6 +611,20 @@ function AssessmentsTab() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ studentId: '', bookingId: '', assessmentDate: toLocalDateTimeInput(new Date().toISOString()), score: '', result: 'PASSED', feedback: '', durationMinutes: '' });
   const [creating, setCreating] = useState(false);
+  // The instructor's recent and upcoming lessons, to link an assessment to one.
+  const [myLessons, setMyLessons] = useState([]);
+
+  useEffect(() => {
+    if (!showForm || !isInstructor || !user?.instructorProfileId) return;
+    const now = Date.now();
+    const from = new Date(now - 60 * 86400000).toISOString().slice(0, 19);
+    const to = new Date(now + 30 * 86400000).toISOString().slice(0, 19);
+    BookingApi.listByInstructor(user.instructorProfileId, from, to)
+      .then((list) => setMyLessons((list || []).filter((b) => b.status !== 'CANCELLED')
+        .sort((a, b) => new Date(b.scheduledAt) - new Date(a.scheduledAt))))
+      .catch(() => setMyLessons([]));
+  }, [showForm, isInstructor, user?.instructorProfileId]);
+  const studentLessons = myLessons.filter((b) => String(b.studentId) === String(form.studentId));
 
   const loadForStudent = async (id) => {
     if (!id) return;
@@ -666,8 +680,13 @@ function AssessmentsTab() {
       {showForm && isInstructor && (
         <Card className="fade-in respo-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
           <form onSubmit={create} style={{ display: 'contents' }}>
-            <Field label="Student profile ID" required><Input required value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} /></Field>
-            <Field label="Booking ID (optional)"><Input value={form.bookingId} onChange={(e) => setForm((f) => ({ ...f, bookingId: e.target.value }))} /></Field>
+            <StudentPicker schoolId={user?.schoolId} required value={form.studentId} onChange={(id) => setForm((f) => ({ ...f, studentId: id, bookingId: '' }))} />
+            <Field label="Lesson (optional)" hint={form.studentId && studentLessons.length === 0 ? 'No recent lessons with this student' : 'Which lesson this assessment was for'}>
+              <Select value={form.bookingId} onChange={(e) => setForm((f) => ({ ...f, bookingId: e.target.value }))} disabled={!form.studentId || studentLessons.length === 0}>
+                <option value="">{form.studentId ? 'Not linked to a lesson' : 'Choose a student first'}</option>
+                {studentLessons.map((b) => <option key={b.id} value={b.id}>{fmtDateTime(b.scheduledAt)} · {humanize(b.bookingType)}</option>)}
+              </Select>
+            </Field>
             <Field label="Assessment date" required><Input type="datetime-local" required value={form.assessmentDate} onChange={(e) => setForm((f) => ({ ...f, assessmentDate: e.target.value }))} /></Field>
             <Field label="Score (0-100)" required><Input type="number" min={0} max={100} required value={form.score} onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))} /></Field>
             <Field label="Result" required>
@@ -683,18 +702,27 @@ function AssessmentsTab() {
       )}
 
       {(isAdmin || isInstructor) && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
-          <Input placeholder="Look up a student's assessments by ID" value={lookupStudentId} onChange={(e) => setLookupStudentId(e.target.value)} style={{ maxWidth: 260, flex: '1 1 220px' }} />
-          <Button variant="outline" onClick={() => loadForStudent(lookupStudentId)}>Look up</Button>
-          {isInstructor && <Button variant="ghost" onClick={loadMine}>Show my assessments</Button>}
+        <div style={{ maxWidth: 320, marginBottom: 18 }}>
+          <StudentPicker
+            schoolId={user?.schoolId}
+            label="Student"
+            hint={isInstructor ? 'Leave empty to see all the assessments you’ve recorded' : undefined}
+            value={lookupStudentId}
+            onChange={(id) => {
+              setLookupStudentId(id);
+              if (id) loadForStudent(id);
+              else if (isInstructor) loadMine();
+              else setAssessments(null);
+            }}
+          />
         </div>
       )}
 
-      {/* Students and instructors load their own list straight away; an admin has
-          nothing to show until they look a student up. */}
+      {/* Students and instructors load their own list straight away; an admin
+          picks a student first. */}
       {!loading && assessments === null && !isStudent && !isInstructor ? (
-        <EmptyState icon={<Icons.IconShield size={22} />} title="Look up a student">
-          Enter a student profile ID above to see their driving assessments.
+        <EmptyState icon={<Icons.IconShield size={22} />} title="Choose a student">
+          Pick a student above to see their driving assessments.
         </EmptyState>
       ) : loading || assessments === null ? (
         <SkeletonList count={2} small />
@@ -707,7 +735,7 @@ function AssessmentsTab() {
               <AssessmentRow
                 a={a}
                 canEdit={isInstructor && a.instructorId === user?.instructorProfileId}
-                onSaved={() => (isStudent ? loadForStudent(user.studentProfileId) : loadMine())}
+                onSaved={() => (isStudent ? loadForStudent(user.studentProfileId) : lookupStudentId ? loadForStudent(lookupStudentId) : loadMine())}
                 toast={toast}
               />
             </Reveal>

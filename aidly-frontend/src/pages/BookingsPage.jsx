@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
-import { BookingApi, VehicleApi, LessonRouteApi } from '../api/endpoints';
+import { BookingApi, VehicleApi, LessonRouteApi, InstructorApi, StudentApi } from '../api/endpoints';
 import { Button, Card, Badge, Field, Input, Textarea, Select, Tabs, EmptyState, SkeletonList, Icons, Reveal, StudentPicker } from '../components/ui';
 import { fmtDateTime, fmtTime, fmtWeekday, fromLocalDateTimeInput, toDate } from '../utils/format';
 import useIsMobile from '../hooks/useIsMobile';
@@ -10,6 +10,18 @@ import useIsMobile from '../hooks/useIsMobile';
 const BOOKING_TYPES = ['ROAD_LESSON', 'THEORY_SESSION', 'DRIVING_ASSESSMENT', 'PRACTICE_TEST'];
 
 const emptyForm = { studentId: '', instructorId: '', vehicleId: '', scheduledAt: '', durationMinutes: 60, bookingType: 'ROAD_LESSON', notes: '' };
+
+// The window of lessons shown for an instructor (and so for the admin's whole
+// school): the last 30 days - a lesson can only be completed after it starts -
+// and the next 30.
+function scheduleWindow() {
+  const now = Date.now();
+  return {
+    from: new Date(now - 30 * 86400000).toISOString().slice(0, 19),
+    to: new Date(now + 30 * 86400000).toISOString().slice(0, 19),
+  };
+}
+const byName = (a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
 
 // A confirmed lesson whose time has passed but hasn't been marked complete yet.
 function needsCompleting(b) {
@@ -61,8 +73,11 @@ export default function BookingsPage() {
   const [creating, setCreating] = useState(false);
   const [vehicles, setVehicles] = useState([]);
 
-  const [lookupStudentId, setLookupStudentId] = useState('');
-  const [lookupInstructorId, setLookupInstructorId] = useState('');
+  // Admin: the school's people, to filter by name instead of ID.
+  const [instructors, setInstructors] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [filterInstructor, setFilterInstructor] = useState('');
+  const [filterStudent, setFilterStudent] = useState('');
 
   const loadForStudent = async (id) => {
     if (!id) return;
@@ -75,13 +90,30 @@ export default function BookingsPage() {
   const loadForInstructor = async (id) => {
     if (!id) return;
     setLoading(true);
-    // Include the last 30 days too - a lesson can only be marked complete
-    // after it happens, so it must still be listed once its start time passes.
-    const now = new Date();
-    const from = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 19);
-    const to = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 19);
+    const { from, to } = scheduleWindow();
     try { setBookings(await BookingApi.listByInstructor(id, from, to) || []); }
     catch (err) { toast.error(err.message); }
+    finally { setLoading(false); }
+  };
+
+  // Admin: there's no school-wide bookings list, so put every instructor's
+  // schedule together - or one student's full history when one is chosen.
+  const loadForAdmin = async (studentId = filterStudent) => {
+    if (!user?.schoolId) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      if (studentId) {
+        setBookings(await BookingApi.listByStudent(studentId) || []);
+      } else {
+        const list = (await InstructorApi.listBySchool(user.schoolId)) || [];
+        setInstructors(list.slice().sort(byName));
+        const { from, to } = scheduleWindow();
+        const schedules = await Promise.all(list.map((i) => BookingApi.listByInstructor(i.id, from, to).catch(() => [])));
+        const seen = new Map();
+        schedules.flat().forEach((b) => { if (b?.id != null) seen.set(b.id, b); });
+        setBookings([...seen.values()]);
+      }
+    } catch (err) { toast.error(err.message); }
     finally { setLoading(false); }
   };
 
@@ -89,10 +121,22 @@ export default function BookingsPage() {
     if (!user) return;
     if (isStudent) loadForStudent(user.studentProfileId);
     else if (isInstructor) loadForInstructor(user.instructorProfileId);
+    else if (isAdmin) loadForAdmin();
     else setLoading(false);
   };
 
   useEffect(() => { loadMine(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user]);
+
+  useEffect(() => {
+    if (!isAdmin || !user?.schoolId) return;
+    StudentApi.listBySchool(user.schoolId).then((l) => setStudents((l || []).slice().sort(byName))).catch(() => {});
+  }, [isAdmin, user?.schoolId]);
+
+  // The admin's instructor filter narrows what's loaded, without another request.
+  const shownBookings = useMemo(
+    () => (isAdmin && filterInstructor ? bookings.filter((b) => String(b.instructorId) === filterInstructor) : bookings),
+    [bookings, isAdmin, filterInstructor],
+  );
 
   useEffect(() => {
     if (user?.schoolId) VehicleApi.listBySchool(user.schoolId).then((v) => setVehicles((v || []).filter((x) => x.status === 'AVAILABLE'))).catch(() => {});
@@ -128,7 +172,7 @@ export default function BookingsPage() {
   };
 
   const dayGroups = useMemo(() => {
-    const rows = [...bookings].sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
+    const rows = [...shownBookings].sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
     const map = new Map();
     rows.forEach((b) => {
       const d = b.scheduledAt ? b.scheduledAt.slice(0, 10) : 'Unscheduled';
@@ -136,7 +180,7 @@ export default function BookingsPage() {
       map.get(d).push(b);
     });
     return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
-  }, [bookings]);
+  }, [shownBookings]);
 
   return (
     <div className="fade-in">
@@ -156,11 +200,24 @@ export default function BookingsPage() {
       </div>
 
       {isAdmin && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
-          <Input size="sm" placeholder="Student profile ID" value={lookupStudentId} onChange={(e) => setLookupStudentId(e.target.value)} style={{ width: 170 }} />
-          <Button size="sm" variant="outline" onClick={() => loadForStudent(lookupStudentId)}>Load student&rsquo;s bookings</Button>
-          <Input size="sm" placeholder="Instructor profile ID" value={lookupInstructorId} onChange={(e) => setLookupInstructorId(e.target.value)} style={{ width: 170 }} />
-          <Button size="sm" variant="outline" onClick={() => loadForInstructor(lookupInstructorId)}>Load instructor&rsquo;s schedule</Button>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Select size="sm" aria-label="Filter by instructor" value={filterInstructor} onChange={(e) => setFilterInstructor(e.target.value)} style={{ width: 'auto', minWidth: 190 }}>
+            <option value="">All instructors</option>
+            {instructors.map((i) => <option key={i.id} value={String(i.id)}>{i.firstName} {i.lastName}{i.active === false ? ' (inactive)' : ''}</option>)}
+          </Select>
+          <Select
+            size="sm"
+            aria-label="Filter by student"
+            value={filterStudent}
+            onChange={(e) => { setFilterStudent(e.target.value); loadForAdmin(e.target.value); }}
+            style={{ width: 'auto', minWidth: 190 }}
+          >
+            <option value="">All students</option>
+            {students.map((st) => <option key={st.id} value={String(st.id)}>{st.firstName} {st.lastName}</option>)}
+          </Select>
+          <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+            {filterStudent ? 'All of this student’s lessons' : 'Last 30 days and next 30 days'}
+          </span>
         </div>
       )}
 
@@ -169,9 +226,18 @@ export default function BookingsPage() {
           <form onSubmit={createBooking}>
             <div className="form-grid respo-two-col">
               <StudentPicker schoolId={user?.schoolId} required value={form.studentId} onChange={(v) => setForm((f) => ({ ...f, studentId: v }))} />
-              <Field label="Instructor profile ID" required hint={isInstructor ? 'Defaults to you' : undefined}>
-                <Input required value={form.instructorId} onChange={(e) => setForm((f) => ({ ...f, instructorId: e.target.value }))} />
-              </Field>
+              {isAdmin ? (
+                <Field label="Instructor" required>
+                  <Select required value={form.instructorId} onChange={(e) => setForm((f) => ({ ...f, instructorId: e.target.value }))}>
+                    <option value="">Choose an instructor…</option>
+                    {instructors.filter((i) => i.active !== false).map((i) => <option key={i.id} value={i.id}>{i.firstName} {i.lastName}</option>)}
+                  </Select>
+                </Field>
+              ) : (
+                <Field label="Instructor" hint="Lessons you book are yours">
+                  <Input value={[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'You'} disabled />
+                </Field>
+              )}
               <Field label="Vehicle (optional)">
                 <Select value={form.vehicleId} onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))}>
                   <option value="">No vehicle needed</option>
@@ -200,9 +266,9 @@ export default function BookingsPage() {
 
       {loading ? (
         <SkeletonList count={3} />
-      ) : bookings.length === 0 ? (
-        <EmptyState icon={<Icons.IconCalendar size={22} />} title="No bookings loaded">
-          {isAdmin ? 'Look up a student or instructor above.' : 'Nothing scheduled yet.'}
+      ) : shownBookings.length === 0 ? (
+        <EmptyState icon={<Icons.IconCalendar size={22} />} title="No lessons to show">
+          {isAdmin && (filterInstructor || filterStudent) ? 'Nothing matches these filters.' : 'Nothing scheduled yet.'}
         </EmptyState>
       ) : view === 'calendar' ? (
         <>
@@ -242,7 +308,7 @@ export default function BookingsPage() {
         </>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {bookings.map((b, i) => (
+          {shownBookings.map((b, i) => (
             <Reveal key={b.id} delay={Math.min(i, 8) * 40}>
               <Card tight hover>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
