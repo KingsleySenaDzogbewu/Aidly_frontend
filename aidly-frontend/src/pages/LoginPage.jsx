@@ -17,6 +17,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  // Off by default: on a shared computer, closing the browser signs you out.
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -45,7 +47,7 @@ export default function LoginPage() {
     setBusy(true);
     setError('');
     try {
-      const result = await login(email, password);
+      const result = await login(email, password, keepSignedIn);
       if (result?.verificationRequired) {
         setChallenge(result.verification);
         return;
@@ -129,6 +131,16 @@ export default function LoginPage() {
                 </button>
               </div>
             </Field>
+
+            <label className="checkbox-row" style={{ cursor: 'pointer', marginTop: 2 }}>
+              <input type="checkbox" checked={keepSignedIn} onChange={(e) => setKeepSignedIn(e.target.checked)} />
+              <span>
+                Keep me signed in
+                <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)' }}>
+                  Only on your own device. Otherwise you’re signed out when you close the browser or after 2 hours without activity.
+                </span>
+              </span>
+            </label>
 
             {error && <div className="login-error">{error}</div>}
 

@@ -199,7 +199,8 @@ function ResourcesPanel({ lessonId, canManage, toast, onCountChange }) {
                     <Icons.IconFile size={13} style={{ flexShrink: 0 }} /> {r.title} <span style={{ color: 'var(--text-faint)' }}>({r.type} link ↗)</span>
                   </a>
                 )}
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
+                {/* Wraps onto its own line(s) in narrow columns instead of overflowing. */}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
                   {r.uploaded && (
                     <>
                       <Button size="sm" variant="ghost" onClick={() => view(r)}><Icons.IconEye size={13} /> View</Button>

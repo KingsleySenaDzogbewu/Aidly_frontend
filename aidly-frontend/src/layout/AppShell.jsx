@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { TopProgress, Icons } from '../components/ui';
+import { TopProgress, Icons, SkeletonList } from '../components/ui';
 import useIsMobile from '../hooks/useIsMobile';
 import './layout.css';
 
@@ -41,7 +41,10 @@ export default function AppShell() {
 
       <main className="content respo-content aurora-bg">
         <div key={location.pathname} className="route-transition">
-          <Outlet />
+          {/* Pages are downloaded on first visit; the menu and top bar stay put meanwhile. */}
+          <Suspense fallback={<div aria-busy="true" aria-label="Loading page"><SkeletonList count={3} /></div>}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
     </div>

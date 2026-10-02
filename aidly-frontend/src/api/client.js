@@ -73,8 +73,15 @@ http.interceptors.response.use(
     const original = error.config;
 
     if (!error.response) {
+      // No reply at all. Only blame the user's connection when the browser
+      // knows it's offline; otherwise it's usually the server (asleep,
+      // restarting or down), which the user can't fix.
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
       return Promise.reject(new ApiError(
-        'Could not reach the server. Check your connection and try again.', undefined, null,
+        offline
+          ? 'You’re offline. Check your internet connection and try again.'
+          : 'The server isn’t responding right now. Please try again in a minute.',
+        undefined, null,
       ));
     }
 
@@ -96,16 +103,24 @@ http.interceptors.response.use(
       }
     }
 
-    const body = error.response.data;
+    let body = error.response.data;
+    // File downloads ask for a Blob, so an error reply arrives as a Blob too -
+    // read it back as JSON to get the backend's message.
+    if (typeof Blob !== 'undefined' && body instanceof Blob) {
+      try { body = JSON.parse(await body.text()); } catch { body = null; }
+    }
     // Validation failures carry the useful detail in `errors` ({ field: ["Response
     // must be between 10 and 3000 characters"] }) - show those sentences, one per
     // line, instead of the bare "Validation failed" headline.
     const fieldErrors = body && body.errors && typeof body.errors === 'object'
       ? Object.values(body.errors).flat().filter((m) => typeof m === 'string' && m)
       : [];
+    const fallback = error.response.status >= 500
+      ? 'Something went wrong on the server. Please try again later.'
+      : `Request failed (${error.response.status})`;
     const message = fieldErrors.length > 0
       ? fieldErrors.join('\n')
-      : (body && body.message) || `Request failed (${error.response.status})`;
+      : (body && body.message) || fallback;
 
     if (error.response.status === 401) {
       if (original?.noAuth) {

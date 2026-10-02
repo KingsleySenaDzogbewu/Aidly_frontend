@@ -1,15 +1,63 @@
+import { Children, cloneElement, isValidElement, useId } from 'react';
+
+const isControl = (el) => isValidElement(el)
+  && (el.type === Input || el.type === Select || el.type === Textarea
+    || el.type === 'input' || el.type === 'select' || el.type === 'textarea');
+
+// Gives the field's control an id (unless it has one) and points it at the
+// hint/error text. Also looks one level into a wrapper, e.g. a password box
+// wrapped in a div with a show/hide button.
+function linkControl(children, controlProps) {
+  let linked = false;
+  const link = (el) => {
+    if (linked || !isControl(el)) return el;
+    linked = true;
+    return cloneElement(el, { id: el.props.id || controlProps.id, ...controlProps.extra });
+  };
+  const out = Children.map(children, (child) => {
+    if (isControl(child)) return link(child);
+    if (isValidElement(child) && child.props.children) {
+      return cloneElement(child, {}, Children.map(child.props.children, link));
+    }
+    return child;
+  });
+  return { out, linked };
+}
+
+// A label + control + hint/error. The label is linked to the control
+// (htmlFor/id), so tapping it focuses the box and screen readers announce the
+// field's name; the hint/error is announced as the box's description.
 export function Field({ label, hint, error, required, children, className = '', style }) {
+  const baseId = useId();
+  const controlId = `${baseId}-control`;
+  const describedBy = error ? `${baseId}-error` : hint ? `${baseId}-hint` : undefined;
+  const { out, linked } = linkControl(children, {
+    id: controlId,
+    extra: { 'aria-describedby': describedBy, ...(error ? { 'aria-invalid': true } : {}) },
+  });
+  // If the control already had its own id, point the label at that.
+  const firstControl = (() => {
+    let found = null;
+    Children.forEach(children, (c) => {
+      if (found) return;
+      if (isControl(c)) found = c;
+      else if (isValidElement(c)) Children.forEach(c.props.children, (cc) => { if (!found && isControl(cc)) found = cc; });
+    });
+    return found;
+  })();
+  const labelFor = linked ? (firstControl?.props.id || controlId) : undefined;
+
   return (
     <div className={`field ${className}`} style={style}>
       {label && (
-        <label className="field-label">
+        <label className="field-label" htmlFor={labelFor}>
           {label}
-          {required && <span style={{ color: 'var(--danger)' }}> *</span>}
+          {required && <span style={{ color: 'var(--danger)' }} aria-hidden="true"> *</span>}
         </label>
       )}
-      {children}
-      {hint && !error && <div className="field-hint">{hint}</div>}
-      {error && <div className="field-error">{error}</div>}
+      {out}
+      {hint && !error && <div className="field-hint" id={`${baseId}-hint`}>{hint}</div>}
+      {error && <div className="field-error" id={`${baseId}-error`}>{error}</div>}
     </div>
   );
 }
