@@ -118,6 +118,7 @@ function LessonRoutesTab() {
   }, [showForm, isInstructor, user?.instructorProfileId]);
 
   const routedBookingIds = new Set(routes.map((r) => r.bookingId));
+  const replacesRoute = !!plan.bookingId && routedBookingIds.has(Number(plan.bookingId));
 
   // A pin placed or dragged on the map.
   const placePoint = (which, point) => {
@@ -167,11 +168,18 @@ function LessonRoutesTab() {
       if (created?.id) setExpandedId(created.id);
       loadMine();
     } catch (err) {
-      // The routing service can't snap a pin that's far from any road.
-      if (/routable point/i.test(err.message || '')) {
+      const msg = err.message || '';
+      if (/routable point/i.test(msg)) {
+        // The routing service can't snap a pin that's far from any road.
         toast.error('One of the pins isn’t close to a road. Move the start or destination pin onto a street and try again.');
+      } else if (/^Could not generate route:/i.test(msg)) {
+        // The routing service's own reason - usually fixable by moving a pin.
+        toast.error(`${msg.replace(/^Could not generate route:\s*/i, 'The route couldn’t be made: ')} Try moving the pins.`);
+      } else if (/^Failed to generate route/i.test(msg)) {
+        // The routing service itself failed or didn't answer - worth retrying.
+        toast.error('The map routing service didn’t respond. Please try again in a moment.');
       } else {
-        toast.error(err.message);
+        toast.error(msg);
       }
     } finally { setGenerating(false); }
   };
@@ -289,7 +297,13 @@ function LessonRoutesTab() {
               </Field>
             </div>
 
-            <Button type="submit" loading={generating} disabled={!bookingOptions || bookingOptions.length === 0}>Generate route</Button>
+            {/* A lesson has one route: generating again replaces it. */}
+            {replacesRoute && (
+              <div className="field-hint" style={{ marginTop: -6 }}>This lesson already has a route. Regenerating replaces it.</div>
+            )}
+            <Button type="submit" loading={generating} disabled={!bookingOptions || bookingOptions.length === 0}>
+              {replacesRoute ? 'Regenerate route' : 'Generate route'}
+            </Button>
           </form>
         </Card>
       )}

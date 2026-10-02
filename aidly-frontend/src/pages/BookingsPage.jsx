@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { BookingApi, VehicleApi, LessonRouteApi } from '../api/endpoints';
 import { Button, Card, Badge, Field, Input, Textarea, Select, Tabs, EmptyState, SkeletonList, Icons, Reveal, StudentPicker } from '../components/ui';
-import { fmtDateTime, fmtTime, fmtWeekday, fromLocalDateTimeInput } from '../utils/format';
+import { fmtDateTime, fmtTime, fmtWeekday, fromLocalDateTimeInput, toDate } from '../utils/format';
 import useIsMobile from '../hooks/useIsMobile';
 
 const BOOKING_TYPES = ['ROAD_LESSON', 'THEORY_SESSION', 'DRIVING_ASSESSMENT', 'PRACTICE_TEST'];
@@ -15,6 +15,11 @@ const emptyForm = { studentId: '', instructorId: '', vehicleId: '', scheduledAt:
 function needsCompleting(b) {
   const end = b.endAt || b.scheduledAt;
   return b.status === 'CONFIRMED' && !!end && new Date(end).getTime() < Date.now();
+}
+
+// The server only completes a confirmed lesson once it has started.
+function canComplete(b) {
+  return b.status === 'CONFIRMED' && !!b.scheduledAt && toDate(b.scheduledAt).getTime() <= Date.now();
 }
 
 function NeedsCompletingTag() {
@@ -224,7 +229,7 @@ export default function BookingsPage() {
                     {canManage && (
                       <div style={{ display: 'flex', gap: 5, marginTop: 8 }}>
                         <button className="btn btn-outline btn-sm" style={{ flex: 1, padding: '7px 5px', fontSize: 11 }} onClick={() => doAction(b.id, 'confirm')}>Confirm</button>
-                        <button className="btn btn-outline btn-sm" style={{ flex: 1, padding: '7px 5px', fontSize: 11 }} onClick={() => doAction(b.id, 'complete')}>Complete</button>
+                        {canComplete(b) && <button className="btn btn-outline btn-sm" style={{ flex: 1, padding: '7px 5px', fontSize: 11 }} onClick={() => doAction(b.id, 'complete')}>Complete</button>}
                         <button className="btn btn-outline btn-sm" style={{ flex: 1, padding: '7px 5px', fontSize: 11, color: 'var(--danger)' }} onClick={() => doAction(b.id, 'cancel')}>Cancel</button>
                       </div>
                     )}
@@ -257,7 +262,7 @@ export default function BookingsPage() {
                   {canManage && (
                     <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
                       <Button size="sm" variant="outline" onClick={() => doAction(b.id, 'confirm')}>Confirm</Button>
-                      <Button size="sm" variant="outline" onClick={() => doAction(b.id, 'complete')}>Complete</Button>
+                      {canComplete(b) && <Button size="sm" variant="outline" onClick={() => doAction(b.id, 'complete')}>Complete</Button>}
                       <Button size="sm" variant="danger" onClick={() => doAction(b.id, 'cancel')}>Cancel</Button>
                     </div>
                   )}

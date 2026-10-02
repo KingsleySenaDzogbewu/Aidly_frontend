@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { LiveSessionApi, SchoolApi, InstructorApi } from '../api/endpoints';
 import { Button, Card, Badge, Field, Input, Textarea, Select, SkeletonList, EmptyState, Icons } from '../components/ui';
-import { fmtDateTime, fromLocalDateTimeInput } from '../utils/format';
+import { fmtDateTime, fmtTime, fromLocalDateTimeInput } from '../utils/format';
 
 const STATUS_OPTIONS = ['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
@@ -92,6 +92,15 @@ export default function LiveSessionsPage() {
       if (/already registered/i.test(err.message || '')) { toast.info('You’re already registered for this session'); load(); return; }
       toast.error(err.message);
     }
+  };
+
+  const unregister = async (id) => {
+    if (!window.confirm('Unregister from this session? You’ll lose the meeting link until you register again.')) return;
+    try {
+      await LiveSessionApi.unregister(id);
+      toast.success('You’re no longer registered for this session');
+      load();
+    } catch (err) { toast.error(err.message); }
   };
 
   const changeStatus = async (id, status) => {
@@ -215,10 +224,11 @@ export default function LiveSessionsPage() {
                     {registered && <Badge variant="info">Registered ✓</Badge>}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-                    {fmtDateTime(s.scheduledAt)} · {s.durationMinutes} min · Instructor: {s.instructorName || s.instructorId} · {s.registeredCount ?? 0}{s.maxParticipants ? ` / ${s.maxParticipants}` : ''} registered
+                    {fmtDateTime(s.scheduledAt)}{s.endsAt ? ` – ${fmtTime(s.endsAt)}` : ''} · {s.durationMinutes} min · Instructor: {s.instructorName || s.instructorId} · {s.registeredCount ?? 0}{s.maxParticipants ? ` / ${s.maxParticipants}` : ''} registered
                   </div>
                   {s.description && <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 6 }}>{s.description}</div>}
-                  {s.meetingUrl ? (
+                  {/* Registered students get a Join button instead (on the right). */}
+                  {s.meetingUrl && !registered ? (
                     <a href={s.meetingUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, marginTop: 6, display: 'inline-block' }}>
                       Join meeting link ↗
                     </a>
@@ -231,6 +241,12 @@ export default function LiveSessionsPage() {
                     full
                       ? <Button size="sm" disabled>Session full</Button>
                       : <Button size="sm" onClick={() => register(s.id)}>Register</Button>
+                  )}
+                  {registered && s.meetingUrl && (
+                    <a className="btn btn-primary btn-sm" href={s.meetingUrl} target="_blank" rel="noreferrer">Join ↗</a>
+                  )}
+                  {registered && (s.status === 'SCHEDULED' || s.status === 'IN_PROGRESS') && (
+                    <Button size="sm" variant="ghost" onClick={() => unregister(s.id)}>Unregister</Button>
                   )}
                   {canManage && (
                     <>

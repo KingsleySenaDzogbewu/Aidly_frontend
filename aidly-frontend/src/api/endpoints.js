@@ -209,6 +209,8 @@ export const LiveSessionApi = {
   setStatus: (id, status) => http.put(`/live-sessions/${id}/status`, null, { params: { status } }),
   upcomingForSchool: (schoolId) => http.get(`/live-sessions/school/${schoolId}/upcoming`),
   register: (id, studentId) => http.post(`/live-sessions/${id}/register`, { studentId }),
+  // Student caller: unregister themselves (hides the meeting link again).
+  unregister: (id) => http.delete(`/live-sessions/${id}/register`),
   markPresent: (id, studentId) => http.put(`/live-sessions/${id}/attendance/${studentId}/present`),
   attendance: (id) => http.get(`/live-sessions/${id}/attendance`),
 };
