@@ -29,7 +29,10 @@ p { margin: 0; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
 
-button { font-family: inherit; }
+/* iOS Safari colours button text blue by default; plain buttons (stat cards,
+   quick actions, the mobile top bar) should use the surrounding text colour.
+   Styled .btn variants still set their own colours. */
+button { font-family: inherit; color: inherit; }
 
 input, select, textarea, button { font-family: inherit; font-size: 100%; }
 
