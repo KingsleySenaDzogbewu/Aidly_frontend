@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { InstructorApi, StudentApi } from '../api/endpoints';
 import { Button, Card, Field, Input, Textarea, Icons } from '../components/ui';
-import { initials } from '../utils/format';
+import PhotoEditor from '../features/photos/PhotoEditor';
 
 const emptyForm = { firstName: '', lastName: '', phone: '', specialization: '', yearsExperience: '', bio: '', dateOfBirth: '', profileImageUrl: '' };
 
@@ -33,7 +33,11 @@ export default function ProfilePage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user]);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.userId]);
+
+  // A new photo shows in the sidebar too; reloading also keeps the student
+  // form's copy of the photo link current, so a later Save doesn't undo it.
+  const photoChanged = () => { refreshMe(); if (!isAdmin) load(); };
 
   const save = async (e) => {
     e.preventDefault();
@@ -67,13 +71,9 @@ export default function ProfilePage() {
 
       {isAdmin ? (
         <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div className="avatar" style={{ width: 46, height: 46, fontSize: 16 }}>{initials(null, null, user?.email)}</div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, wordBreak: 'break-word' }}>{user?.email}</div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Administrator</div>
-            </div>
-          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, wordBreak: 'break-word' }}>{user?.email}</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 16 }}>Administrator</div>
+          <PhotoEditor userId="me" src={user?.profileImageUrl} name={user?.email} onChanged={photoChanged} />
           <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginTop: 16, lineHeight: 1.6 }}>
             Admin accounts don&rsquo;t have a student/instructor profile. Manage accounts and schools from Administration.
           </p>
@@ -108,8 +108,10 @@ export default function ProfilePage() {
             </form>
           ) : (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-                <div className="avatar" style={{ width: 52, height: 52, fontSize: 17 }}>{initials(profile.firstName, profile.lastName)}</div>
+              <div style={{ marginBottom: 18 }}>
+                <PhotoEditor userId="me" src={profile.profileImageUrl} name={`${profile.firstName} ${profile.lastName}`} onChanged={photoChanged} />
+              </div>
+              <div style={{ marginBottom: 18 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 19, fontWeight: 700, wordBreak: 'break-word' }}>{profile.firstName} {profile.lastName}</div>
                   <div style={{ fontSize: 13.5, color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>{profile.email} {profile.phone ? `· ${profile.phone}` : ''}</div>

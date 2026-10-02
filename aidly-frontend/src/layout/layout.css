@@ -103,7 +103,8 @@
 .user-card-email { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* When the name is shown above it, the email becomes secondary. */
 .user-card-email-sub { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-top: 1px; }
-.user-card-role { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+.user-card-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.user-card-role { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; }
 
 .content { padding: 32px 40px 60px; max-width: var(--content-max); }
 

@@ -3,7 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { AuthApi, InstructorApi, StudentApi, UserApi, RoleApi } from '../api/endpoints';
-import { Button, Card, Badge, Field, Input, Select, Tabs, Modal, EmptyState, Icons } from '../components/ui';
+import { Avatar, Button, Card, Badge, Field, Input, Select, Tabs, Modal, EmptyState, Icons } from '../components/ui';
+import PhotoField from '../features/photos/PhotoField';
+import PhotoEditor from '../features/photos/PhotoEditor';
 
 const emptyUser = { email: '', password: '', role: 'STUDENT', firstName: '', lastName: '', phone: '', dateOfBirth: '', schoolId: '', specialization: '', licenseNumber: '', yearsExperience: '' };
 const STUDENT_STATUSES = ['ACTIVE', 'INACTIVE', 'SUSPENDED', 'GRADUATED'];
@@ -12,6 +14,7 @@ function RegisterTab({ toast }) {
   const { user, isBootstrapAdmin } = useAuth();
   const lockedSchoolId = !isBootstrapAdmin && user?.schoolId ? String(user.schoolId) : '';
   const [form, setForm] = useState({ ...emptyUser, schoolId: lockedSchoolId });
+  const [photo, setPhoto] = useState(null);
   const [busy, setBusy] = useState(false);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -19,13 +22,21 @@ function RegisterTab({ toast }) {
     e.preventDefault();
     setBusy(true);
     try {
-      await AuthApi.adminRegister({
+      const created = await AuthApi.adminRegister({
         email: form.email, password: form.password, role: form.role, firstName: form.firstName, lastName: form.lastName,
         phone: form.phone || null, dateOfBirth: form.dateOfBirth || null, schoolId: Number(form.schoolId),
         specialization: form.specialization || null, licenseNumber: form.licenseNumber || null,
         yearsExperience: form.yearsExperience ? Number(form.yearsExperience) : null,
       });
       toast.success('User created');
+      // The photo goes up once the account exists. If it fails, the account
+      // is still there - say so, so it can be added from the Directory.
+      const newUserId = created?.user?.id;
+      if (photo && newUserId) {
+        try { await UserApi.uploadPhoto(newUserId, photo); }
+        catch (err) { toast.error(`The account was created, but the photo didn’t save: ${err.message} You can add it from the Directory tab.`); }
+      }
+      setPhoto(null);
       // Keep the locked school ID - the field is disabled, so wiping it would
       // send schoolId 0 on the next account.
       setForm({ ...emptyUser, schoolId: lockedSchoolId });
@@ -56,6 +67,9 @@ function RegisterTab({ toast }) {
         <Field label="Specialization" hint="Instructor only"><Input value={form.specialization} onChange={set('specialization')} disabled={!isInstructorRole} /></Field>
         <Field label="License number" required={isInstructorRole} hint="Required for instructors"><Input value={form.licenseNumber} onChange={set('licenseNumber')} /></Field>
         <Field label="Years experience" className="span-2" hint="Instructor only"><Input type="number" min={0} value={form.yearsExperience} onChange={set('yearsExperience')} disabled={!isInstructorRole} /></Field>
+        <Field label="Photo" className="span-2" hint="Optional. JPEG, PNG or WebP, up to 5 MB. You can add or change it later.">
+          <PhotoField value={photo} onChange={setPhoto} name={`${form.firstName} ${form.lastName}`.trim()} />
+        </Field>
         <Button type="submit" className="span-2" loading={busy}>Create account</Button>
       </form>
     </Card>
@@ -156,6 +170,7 @@ function ManageTab({ toast }) {
 function DirectoryTab({ toast }) {
   const navigate = useNavigate();
   const [schoolId, setSchoolId] = useState('');
+  const [photoTarget, setPhotoTarget] = useState(null); // { userId, name, src }
   const [students, setStudents] = useState(null);
   const [instructors, setInstructors] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -224,15 +239,19 @@ function DirectoryTab({ toast }) {
                 {students.map((s) => (
                   <Card key={s.id} tight hover>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Avatar src={s.profileImageUrl} firstName={s.firstName} lastName={s.lastName} size={36} />
+                        <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13.5, fontWeight: 700 }}>{s.firstName} {s.lastName}</div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.email} · profile #{s.id} · user #{s.userId}</div>
+                        </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                         <Badge status={s.status}>{s.status}</Badge>
                         <Select size="sm" value={s.status} onChange={(e) => changeStudentStatus(s.id, e.target.value)} disabled={busyId === s.id}>
                           {STUDENT_STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
                         </Select>
+                        <Button size="sm" variant="outline" onClick={() => setPhotoTarget({ userId: s.userId, name: `${s.firstName} ${s.lastName}`, src: s.profileImageUrl })}>Photo</Button>
                         <Button size="sm" variant="outline" onClick={() => navigate('/send-notification', { state: { userId: s.userId, name: `${s.firstName} ${s.lastName}` } })}>Notify</Button>
                         <Button size="sm" variant="danger" onClick={() => setDeleteTarget({ userId: s.userId, name: `${s.firstName} ${s.lastName}` })}>Delete</Button>
                       </div>
@@ -252,9 +271,12 @@ function DirectoryTab({ toast }) {
                 {instructors.map((i) => (
                   <Card key={i.id} tight hover>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Avatar src={i.profileImageUrl} firstName={i.firstName} lastName={i.lastName} size={36} />
+                        <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13.5, fontWeight: 700 }}>{i.firstName} {i.lastName}</div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{i.email} · profile #{i.id} · user #{i.userId}</div>
+                        </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                         <Badge status={i.active ? 'ACTIVE' : 'INACTIVE'}>{i.active ? 'Active' : 'Inactive'}</Badge>
@@ -262,6 +284,7 @@ function DirectoryTab({ toast }) {
                           <option value="true">Active</option>
                           <option value="false">Inactive</option>
                         </Select>
+                        <Button size="sm" variant="outline" onClick={() => setPhotoTarget({ userId: i.userId, name: `${i.firstName} ${i.lastName}`, src: i.profileImageUrl })}>Photo</Button>
                         <Button size="sm" variant="outline" onClick={() => navigate('/send-notification', { state: { userId: i.userId, name: `${i.firstName} ${i.lastName}` } })}>Notify</Button>
                         <Button size="sm" variant="danger" onClick={() => setDeleteTarget({ userId: i.userId, name: `${i.firstName} ${i.lastName}` })}>Delete</Button>
                       </div>
@@ -273,6 +296,17 @@ function DirectoryTab({ toast }) {
           </div>
         </div>
       )}
+
+      <Modal open={!!photoTarget} onClose={() => setPhotoTarget(null)} title={`${photoTarget?.name ?? ''}’s photo`}>
+        {photoTarget && (
+          <PhotoEditor
+            userId={photoTarget.userId}
+            src={photoTarget.src}
+            name={photoTarget.name}
+            onChanged={(url) => { setPhotoTarget((t) => (t ? { ...t, src: url } : t)); load(); }}
+          />
+        )}
+      </Modal>
 
       <Modal
         open={!!deleteTarget}

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { SchoolApi, SchoolDeletionRequestApi, VehicleApi, StudentApi, InstructorApi, UserApi } from '../api/endpoints';
-import { Button, Card, Badge, Field, Input, Select, Tabs, Modal, Textarea, EmptyState, SkeletonList, Icons, Reveal } from '../components/ui';
+import { Avatar, Button, Card, Badge, Field, Input, Select, Tabs, Modal, Textarea, EmptyState, SkeletonList, Icons, Reveal } from '../components/ui';
+import PhotoEditor from '../features/photos/PhotoEditor';
 import { fmtDateTime } from '../utils/format';
 
 const VEHICLE_STATUSES = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'];
@@ -140,6 +141,7 @@ function YourSchoolTab({ toast }) {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [deleteUserTarget, setDeleteUserTarget] = useState(null); // { userId, name }
+  const [photoTarget, setPhotoTarget] = useState(null); // { userId, name, src }
   const [deleteSchoolOpen, setDeleteSchoolOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showVehicleForm, setShowVehicleForm] = useState(false);
@@ -255,9 +257,12 @@ function YourSchoolTab({ toast }) {
           {instructors.map((i) => (
             <Card key={i.id} tight hover>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{i.firstName} {i.lastName}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{i.email} · profile #{i.id}</div>
+                <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Avatar src={i.profileImageUrl} firstName={i.firstName} lastName={i.lastName} size={36} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{i.firstName} {i.lastName}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{i.email} · profile #{i.id}</div>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   <Badge status={i.active ? 'ACTIVE' : 'INACTIVE'}>{i.active ? 'Active' : 'Inactive'}</Badge>
@@ -265,6 +270,7 @@ function YourSchoolTab({ toast }) {
                     <option value="true">Active</option>
                     <option value="false">Inactive</option>
                   </Select>
+                  <Button size="sm" variant="outline" onClick={() => setPhotoTarget({ userId: i.userId, name: `${i.firstName} ${i.lastName}`, src: i.profileImageUrl })}>Photo</Button>
                   <Button size="sm" variant="outline" onClick={() => navigate('/send-notification', { state: { userId: i.userId, name: `${i.firstName} ${i.lastName}` } })}>Notify</Button>
                   <Button size="sm" variant="danger" onClick={() => setDeleteUserTarget({ userId: i.userId, name: `${i.firstName} ${i.lastName}` })}>Delete</Button>
                 </div>
@@ -282,15 +288,19 @@ function YourSchoolTab({ toast }) {
           {students.map((s) => (
             <Card key={s.id} tight hover>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{s.firstName} {s.lastName}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.email} · profile #{s.id}</div>
+                <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Avatar src={s.profileImageUrl} firstName={s.firstName} lastName={s.lastName} size={36} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{s.firstName} {s.lastName}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.email} · profile #{s.id}</div>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   <Badge status={s.status}>{s.status}</Badge>
                   <Select size="sm" value={s.status} onChange={(e) => changeStudentStatus(s.id, e.target.value)} disabled={busyId === s.id}>
                     {STUDENT_STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
                   </Select>
+                  <Button size="sm" variant="outline" onClick={() => setPhotoTarget({ userId: s.userId, name: `${s.firstName} ${s.lastName}`, src: s.profileImageUrl })}>Photo</Button>
                   <Button size="sm" variant="outline" onClick={() => navigate('/send-notification', { state: { userId: s.userId, name: `${s.firstName} ${s.lastName}` } })}>Notify</Button>
                   <Button size="sm" variant="danger" onClick={() => setDeleteUserTarget({ userId: s.userId, name: `${s.firstName} ${s.lastName}` })}>Delete</Button>
                 </div>
@@ -352,6 +362,23 @@ function YourSchoolTab({ toast }) {
           This submits a request to permanently delete {school?.name} and your own admin account. It won&rsquo;t take
           effect until the admin of admins approves it.
         </p>
+      </Modal>
+
+      <Modal open={!!photoTarget} onClose={() => setPhotoTarget(null)} title={`${photoTarget?.name ?? ''}’s photo`}>
+        {photoTarget && (
+          <PhotoEditor
+            userId={photoTarget.userId}
+            src={photoTarget.src}
+            name={photoTarget.name}
+            onChanged={(url) => {
+              // Update the lists in place - a full reload would swap the page for its loading state.
+              const withPhoto = (list) => list?.map((x) => (x.userId === photoTarget.userId ? { ...x, profileImageUrl: url } : x));
+              setStudents(withPhoto);
+              setInstructors(withPhoto);
+              setPhotoTarget((t) => (t ? { ...t, src: url } : t));
+            }}
+          />
+        )}
       </Modal>
 
       <Modal

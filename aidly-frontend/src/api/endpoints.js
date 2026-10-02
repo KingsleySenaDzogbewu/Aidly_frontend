@@ -48,6 +48,15 @@ export const RoleApi = {
 
 export const UserApi = {
   remove: (id) => http.delete(`/users/${id}`),
+  // Profile photos (JPEG/PNG/WebP, max 5 MB). userId 'me' = the caller. Staff can
+  // change others': instructors for students, admins for students and instructors.
+  // Returns { userId, profileImageUrl } - a public image link.
+  uploadPhoto: (userId, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return http.post(`/users/${userId}/photo`, form);
+  },
+  removePhoto: (userId) => http.delete(`/users/${userId}/photo`),
 };
 
 export const InstructorApi = {

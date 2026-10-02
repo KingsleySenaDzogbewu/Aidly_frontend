@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AttendanceApi } from '../../api/endpoints';
-import { Badge, Button, Card, EmptyState, Field, Icons, Input, Modal, SkeletonList, Tabs, useToast } from '../../components/ui';
+import { Avatar, Badge, Button, Card, EmptyState, Field, Icons, Input, Modal, SkeletonList, Tabs, useToast } from '../../components/ui';
 import { fmtDateTime, fmtTime } from '../../utils/format';
 import {
   STATUS_LABELS, LESSON_TYPE_LABELS, addDays, confirmationReasonText, fmtPlainDate, formatDistance, saveBlob, todayIn,
@@ -249,7 +249,10 @@ export default function DayRegister({ schoolId, timeZone, canSeeInstructors }) {
             return (
               <li key={e.userId} className={`att-row ${roll ? 'rolling' : ''}`}>
                 <div className="att-row-main">
-                  <div className="att-row-name">{e.name || `User #${e.userId}`}</div>
+                  <div className="att-row-name">
+                    <Avatar src={e.profileImageUrl} name={e.name} size={28} />
+                    {e.name || `User #${e.userId}`}
+                  </div>
                   {detail && <div className="att-muted">{detail}</div>}
                   {pendingReason && <div className="att-row-warn">Needs confirming: {pendingReason}</div>}
                   {!roll && trail.map((t) => <div key={t} className="att-row-trail">{t}</div>)}

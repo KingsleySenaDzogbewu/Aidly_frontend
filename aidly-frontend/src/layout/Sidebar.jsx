@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/react';
 import { useAuth } from '../auth/AuthContext';
 import { useNotifications } from '../features/notifications/NotificationsContext';
 import { useMessages } from '../features/messages/MessagesContext';
-import { Icons } from '../components/ui';
+import { Avatar, Icons } from '../components/ui';
 
 // badge: which unread count to show; messagesOnly: students/instructors only (admins don't message).
 const NAV = [
@@ -131,10 +131,15 @@ export default function Sidebar({ mobile, open, onNavigate, onClose }) {
       </div>
 
       <div className="user-card">
-        {user?.firstName && (
-          <div className="user-card-name">{user.firstName} {user.lastName}</div>
-        )}
-        <div className={user?.firstName ? 'user-card-email user-card-email-sub' : 'user-card-email'}>{user?.email}</div>
+        <div className="user-card-head">
+          <Avatar src={user?.profileImageUrl} firstName={user?.firstName} lastName={user?.lastName} email={user?.email} size={36} />
+          <div style={{ minWidth: 0 }}>
+            {user?.firstName && (
+              <div className="user-card-name">{user.firstName} {user.lastName}</div>
+            )}
+            <div className={user?.firstName ? 'user-card-email user-card-email-sub' : 'user-card-email'}>{user?.email}</div>
+          </div>
+        </div>
         <div className="user-card-role">
           {isAdmin && isBootstrapAdmin ? 'Admin of admins (all schools)' : isAdmin ? 'Admin (your school)' : roles.join(', ') || '—'}
         </div>

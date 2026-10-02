@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { GamificationApi } from '../api/endpoints';
-import { Card, Input, Button, EmptyState, SkeletonList, Icons, Reveal } from '../components/ui';
+import { Avatar, Card, Input, Button, EmptyState, SkeletonList, Icons, Reveal } from '../components/ui';
 
 const RANK_MEDALS = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
@@ -59,6 +59,7 @@ export default function LeaderboardPage() {
                   <div style={{ width: 32, textAlign: 'center', fontSize: RANK_MEDALS[e.rank] ? 20 : 14, fontWeight: 800, color: 'var(--text-muted)', flexShrink: 0 }}>
                     {RANK_MEDALS[e.rank] || `#${e.rank}`}
                   </div>
+                  <Avatar src={e.profileImageUrl} name={e.studentName} size={36} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 700 }}>{e.studentName}{isMe ? ' (you)' : ''}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>

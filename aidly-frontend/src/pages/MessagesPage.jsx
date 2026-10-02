@@ -4,9 +4,9 @@ import { useAuth } from '../auth/AuthContext';
 import { useMessages } from '../features/messages/MessagesContext';
 import { useRealtime, useRealtimeEvent } from '../features/realtime/RealtimeContext';
 import { ConversationApi } from '../api/endpoints';
-import { Button, Input, Modal, SkeletonList, EmptyState, Icons, useToast } from '../components/ui';
+import { Avatar as PersonAvatar, Button, Input, Modal, SkeletonList, EmptyState, Icons, useToast } from '../components/ui';
 import useIsMobile from '../hooks/useIsMobile';
-import { fmtDayLabel, fmtShortWhen, fmtTime, humanize, initials, toDate } from '../utils/format';
+import { fmtDayLabel, fmtShortWhen, fmtTime, humanize, toDate } from '../utils/format';
 import './messages.css';
 
 const PAGE_SIZE = 30;
@@ -18,9 +18,8 @@ const MAX_LENGTH = 5000;
 
 const nameParts = (name = '') => { const [first, ...rest] = name.split(' '); return [first, rest.join(' ')]; };
 
-function Avatar({ name }) {
-  const [first, last] = nameParts(name);
-  return <span className="avatar msg-avatar">{initials(first, last)}</span>;
+function Avatar({ name, src }) {
+  return <PersonAvatar src={src} name={name} size={36} className="msg-avatar" />;
 }
 
 // Oldest -> newest, keyed by id so polls and sends merge without duplicates.
@@ -173,7 +172,7 @@ function Thread({ conversation, isMobile, onBack }) {
               <Icons.IconChevronRight size={16} style={{ transform: 'rotate(180deg)' }} />
             </button>
           )}
-          <Avatar name={conversation.counterpartName} />
+          <Avatar name={conversation.counterpartName} src={conversation.counterpartProfileImageUrl} />
           <div style={{ minWidth: 0 }}>
             <div className="msg-panel-title">{conversation.counterpartName}</div>
             <div className="msg-panel-sub">{humanize(conversation.counterpartRole)}</div>
@@ -283,7 +282,7 @@ function NewMessageModal({ open, onClose, onOpened }) {
           <div className="msg-empty" style={{ padding: 16 }}>{contacts.length === 0 ? 'No one to message yet.' : 'No one matches that name.'}</div>
         ) : filtered.map((c) => (
           <button key={c.profileId} type="button" className="msg-row" onClick={() => start(c)} disabled={openingId !== null}>
-            <Avatar name={`${c.firstName} ${c.lastName}`} />
+            <Avatar name={`${c.firstName} ${c.lastName}`} src={c.profileImageUrl} />
             <span className="msg-row-main"><span className="msg-row-name">{c.firstName} {c.lastName}</span></span>
             {openingId === c.profileId ? <span className="spinner" aria-hidden="true" /> : <Icons.IconChevronRight size={14} style={{ color: 'var(--text-faint)' }} />}
           </button>
@@ -358,7 +357,7 @@ export default function MessagesPage() {
                   onClick={() => select(c.id)}
                   aria-current={c.id === selectedId ? 'true' : undefined}
                 >
-                  <Avatar name={c.counterpartName} />
+                  <Avatar name={c.counterpartName} src={c.counterpartProfileImageUrl} />
                   <span className="msg-row-main">
                     <span className="msg-row-top">
                       <span className="msg-row-name">{c.counterpartName}</span>
