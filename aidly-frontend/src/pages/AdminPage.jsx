@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
 import { AuthApi, InstructorApi, StudentApi, UserApi } from '../api/endpoints';
@@ -73,94 +73,6 @@ function RegisterTab({ toast }) {
         <Button type="submit" className="span-2" loading={busy}>Create account</Button>
       </form>
     </Card>
-  );
-}
-
-function ManageTab({ toast }) {
-  const [instructorId, setInstructorId] = useState('');
-  const [instructorActive, setInstructorActive] = useState('true');
-  const [studentId, setStudentId] = useState('');
-  const [studentStatus, setStudentStatus] = useState('ACTIVE');
-  const [deleteUserId, setDeleteUserId] = useState('');
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  const applyInstructor = async () => {
-    setBusy(true);
-    try { await InstructorApi.setActive(instructorId, instructorActive === 'true'); toast.success('Instructor updated'); }
-    catch (err) { toast.error(err.message); }
-    finally { setBusy(false); }
-  };
-
-  const applyStudent = async () => {
-    setBusy(true);
-    try { await StudentApi.setStatus(studentId, studentStatus); toast.success('Student updated'); }
-    catch (err) { toast.error(err.message); }
-    finally { setBusy(false); }
-  };
-
-  const confirmDelete = async () => {
-    setBusy(true);
-    try {
-      await UserApi.remove(deleteUserId);
-      toast.success('User deleted');
-      setDeleteUserId('');
-      setConfirmOpen(false);
-    } catch (err) { toast.error(err.message); }
-    finally { setBusy(false); }
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 640 }}>
-      <Card tight>
-        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10 }}>Activate / deactivate instructor</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Input size="sm" placeholder="Instructor profile ID" value={instructorId} onChange={(e) => setInstructorId(e.target.value)} style={{ width: 170 }} />
-          <Select size="sm" value={instructorActive} onChange={(e) => setInstructorActive(e.target.value)}>
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
-          </Select>
-          <Button size="sm" loading={busy} disabled={!instructorId} onClick={applyInstructor}>Apply</Button>
-        </div>
-      </Card>
-
-      <Card tight>
-        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10 }}>Update student status</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Input size="sm" placeholder="Student profile ID" value={studentId} onChange={(e) => setStudentId(e.target.value)} style={{ width: 170 }} />
-          <Select size="sm" value={studentStatus} onChange={(e) => setStudentStatus(e.target.value)}>
-            {STUDENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </Select>
-          <Button size="sm" loading={busy} disabled={!studentId} onClick={applyStudent}>Apply</Button>
-        </div>
-      </Card>
-
-      <Card tight>
-        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10 }}>Delete a user account</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Input size="sm" placeholder="User ID" value={deleteUserId} onChange={(e) => setDeleteUserId(e.target.value)} style={{ width: 170 }} />
-          <Button size="sm" variant="danger-solid" disabled={!deleteUserId} onClick={() => setConfirmOpen(true)}>
-            <Icons.IconTrash size={13} /> Delete
-          </Button>
-        </div>
-      </Card>
-
-      <Modal
-        open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        title="Delete this user account?"
-        footer={(
-          <>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
-            <Button variant="danger-solid" loading={busy} onClick={confirmDelete}>Delete account</Button>
-          </>
-        )}
-      >
-        <p style={{ fontSize: 13.5, color: 'var(--text-muted)' }}>
-          This soft-deletes user #{deleteUserId}. They will no longer be able to sign in.
-        </p>
-      </Modal>
-    </div>
   );
 }
 
@@ -337,7 +249,6 @@ export default function AdminPage() {
   const tabOptions = [
     { value: 'register', label: 'Register user' },
     ...(isBootstrapAdmin ? [{ value: 'directory', label: 'Directory' }] : []),
-    { value: 'manage', label: 'Manage accounts' },
   ];
 
   // A ?tab= this admin can't see (e.g. "directory" for a regular admin) would
@@ -348,12 +259,18 @@ export default function AdminPage() {
   return (
     <div className="fade-in">
       <h1 className="page-title">Admin</h1>
-      <p className="page-subtitle" style={{ marginBottom: 20 }}>Register and manage accounts.</p>
-      <Tabs value={tab} onChange={setTab} options={tabOptions} />
-      <div style={{ height: 20 }} />
+      <p className="page-subtitle" style={{ marginBottom: 20 }}>
+        Create student and instructor accounts.{!isBootstrapAdmin && <> To change, notify or delete someone, use <Link to="/fleet">Schools &amp; fleet → Your school</Link>.</>}
+      </p>
+      {/* A regular admin only has the one tab - no need for a tab bar. */}
+      {tabOptions.length > 1 && (
+        <>
+          <Tabs value={tab} onChange={setTab} options={tabOptions} />
+          <div style={{ height: 20 }} />
+        </>
+      )}
       {tab === 'register' && <RegisterTab toast={toast} />}
       {tab === 'directory' && isBootstrapAdmin && <DirectoryTab toast={toast} />}
-      {tab === 'manage' && <ManageTab toast={toast} />}
     </div>
   );
 }

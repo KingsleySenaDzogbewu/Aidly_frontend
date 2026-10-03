@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/ui';
-import { LessonNoteApi, LessonQuestionApi, ConversationApi } from '../api/endpoints';
+import { LessonNoteApi, LessonQuestionApi, ConversationApi, BookingApi } from '../api/endpoints';
 import { Button, Card, Badge, Field, Input, Textarea, Select, Tabs, SkeletonList, EmptyState, Icons, Reveal, StudentPicker, LengthHint } from '../components/ui';
-import { fmtDateTime } from '../utils/format';
+import { fmtDateTime, humanize } from '../utils/format';
 
 const QUESTION_STATUSES = ['PENDING', 'IN_PROGRESS', 'ANSWERED', 'CLOSED'];
 
@@ -102,6 +102,19 @@ export default function NotesQuestionsPage() {
   const [noteForm, setNoteForm] = useState(emptyNote);
   const [savingNote, setSavingNote] = useState(false);
   const [expandedNoteId, setExpandedNoteId] = useState(null);
+  // The instructor's recent and upcoming lessons, to link a note to one.
+  const [myLessons, setMyLessons] = useState([]);
+  useEffect(() => {
+    if (!showNoteForm || !isInstructor || !user?.instructorProfileId) return;
+    const now = Date.now();
+    const from = new Date(now - 60 * 86400000).toISOString().slice(0, 19);
+    const to = new Date(now + 30 * 86400000).toISOString().slice(0, 19);
+    BookingApi.listByInstructor(user.instructorProfileId, from, to)
+      .then((list) => setMyLessons((list || []).filter((b) => b.status !== 'CANCELLED')
+        .sort((a, b) => new Date(b.scheduledAt) - new Date(a.scheduledAt))))
+      .catch(() => setMyLessons([]));
+  }, [showNoteForm, isInstructor, user?.instructorProfileId]);
+  const noteStudentLessons = myLessons.filter((b) => String(b.studentId) === String(noteForm.studentId));
 
   const loadNotes = async () => {
     if (!user) return;
@@ -240,8 +253,13 @@ export default function NotesQuestionsPage() {
             <Card className="fade-in" style={{ marginBottom: 18 }}>
               <form onSubmit={createNote}>
                 <div className="form-grid respo-two-col" style={{ marginBottom: 10 }}>
-                  <StudentPicker schoolId={user?.schoolId} required value={noteForm.studentId} onChange={(v) => setNoteForm((f) => ({ ...f, studentId: v }))} />
-                  <Field label="Booking ID (optional)"><Input value={noteForm.bookingId} onChange={(e) => setNoteForm((f) => ({ ...f, bookingId: e.target.value }))} /></Field>
+                  <StudentPicker schoolId={user?.schoolId} required value={noteForm.studentId} onChange={(v) => setNoteForm((f) => ({ ...f, studentId: v, bookingId: '' }))} />
+                  <Field label="Lesson (optional)" hint={noteForm.studentId && noteStudentLessons.length === 0 ? 'No recent lessons with this student' : 'Which lesson this note is about'}>
+                    <Select value={noteForm.bookingId} onChange={(e) => setNoteForm((f) => ({ ...f, bookingId: e.target.value }))} disabled={!noteForm.studentId || noteStudentLessons.length === 0}>
+                      <option value="">{noteForm.studentId ? 'Not linked to a lesson' : 'Choose a student first'}</option>
+                      {noteStudentLessons.map((b) => <option key={b.id} value={b.id}>{fmtDateTime(b.scheduledAt)} · {humanize(b.bookingType)}</option>)}
+                    </Select>
+                  </Field>
                 </div>
                 <Field label="Lesson summary" required hint={<LengthHint value={noteForm.lessonSummary} min={10} max={1000} />} style={{ marginBottom: 14 }}>
                   <Textarea rows={2} required minLength={10} maxLength={1000} value={noteForm.lessonSummary} onChange={(e) => setNoteForm((f) => ({ ...f, lessonSummary: e.target.value }))} />
