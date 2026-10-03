@@ -18,6 +18,7 @@ export default function OverviewPage() {
 
   return (
     <div className="fade-in">
+      {user?.schoolName && <div className="overview-school">{user.schoolName}</div>}
       {/* First name for students/instructors; admins have no name, so just the greeting. */}
       <h1 className="page-title">{greeting}{user?.firstName ? `, ${user.firstName}` : ''}</h1>
       <p className="page-subtitle" style={{ marginBottom: 28 }}>

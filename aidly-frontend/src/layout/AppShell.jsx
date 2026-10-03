@@ -1,6 +1,8 @@
 import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import SchoolBrand from './SchoolBrand';
+import { useAuth } from '../auth/AuthContext';
 import { TopProgress, Icons, SkeletonList } from '../components/ui';
 import useIsMobile from '../hooks/useIsMobile';
 import './layout.css';
@@ -9,6 +11,12 @@ export default function AppShell() {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
+
+  // The browser tab names the school too.
+  useEffect(() => {
+    document.title = user?.schoolName ? `${user.schoolName} · Aidly` : 'Aidly — Driving School Portal';
+  }, [user?.schoolName]);
 
   // Close the drawer automatically whenever the route changes.
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
@@ -29,7 +37,7 @@ export default function AppShell() {
       <button type="button" className="mobile-topbar respo-mobile-topbar" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
         <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className="mobile-topbar-btn"><Icons.IconMenu size={20} /></span>
-          <span style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', fontFamily: 'var(--font-display)' }}>Aidly</span>
+          <SchoolBrand name={user?.schoolName} logoUrl={user?.schoolLogoUrl} compact />
         </span>
       </button>
 

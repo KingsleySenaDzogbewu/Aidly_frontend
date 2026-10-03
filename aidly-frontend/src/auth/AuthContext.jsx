@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { AuthApi, InstructorApi, StudentApi } from '../api/endpoints';
+import { AuthApi, InstructorApi, SchoolApi, StudentApi } from '../api/endpoints';
 import { useToast } from '../components/ui';
 import { getAuthState, setSession, clearSession, subscribeAuth, setRememberMe, isRemembered } from './tokenStore';
 
@@ -18,15 +18,24 @@ function writeLastActive(ts = Date.now()) {
 }
 
 // /auth/me has no name, so students and instructors get their first/last
-// name from their own profile (used for the greeting and sidebar). Admins
-// have no profile or name. Best effort - a failure just means no name shown.
+// name and school name from their own profile (used for the greeting and the
+// school badge). Admins have no profile, so their school's name comes from
+// the school itself; the bootstrap admin has no school. Best effort - a
+// failure just means no name shown.
 async function withProfileName(me) {
   try {
     const roles = me?.roles || [];
     const profile = roles.includes('INSTRUCTOR') ? await InstructorApi.me()
       : roles.includes('STUDENT') ? await StudentApi.me()
         : null;
-    return profile ? { ...me, firstName: profile.firstName, lastName: profile.lastName, schoolName: profile.schoolName } : me;
+    if (profile) {
+      return { ...me, firstName: profile.firstName, lastName: profile.lastName, schoolName: profile.schoolName };
+    }
+    if (roles.includes('ADMIN') && !me?.bootstrapAdmin && me?.schoolId) {
+      const school = await SchoolApi.get(me.schoolId);
+      return { ...me, schoolName: school?.name, schoolLogoUrl: me.schoolLogoUrl ?? school?.logoUrl ?? null };
+    }
+    return me;
   } catch {
     return me;
   }

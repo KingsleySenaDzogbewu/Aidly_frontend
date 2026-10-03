@@ -62,3 +62,9 @@
 .badge-chip-earned:hover { transform: translateY(-3px); box-shadow: var(--shadow-sm); }
 .badge-chip-locked img { opacity: 0.28; filter: grayscale(1); }
 .badge-chip-locked { opacity: 0.75; }
+
+/* The school's name above the greeting. */
+.overview-school {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 6px;
+}

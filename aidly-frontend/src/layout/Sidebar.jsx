@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useNotifications } from '../features/notifications/NotificationsContext';
 import { useMessages } from '../features/messages/MessagesContext';
 import { Avatar, Icons } from '../components/ui';
+import SchoolBrand from './SchoolBrand';
 
 // badge: which unread count to show; messagesOnly: students/instructors only (admins don't message).
 const NAV = [
@@ -56,14 +57,7 @@ export default function Sidebar({ mobile, open, onNavigate, onClose }) {
   return (
     <nav className={classes} aria-label="Primary" aria-hidden={mobile && !open}>
       <div className="brand">
-        <div className="brand-mark">
-          <svg width="16" height="14" viewBox="0 0 16 14" fill="none">
-            <rect y="0" width="16" height="3.4" rx="1.5" fill="currentColor" />
-            <rect y="5.3" width="10" height="3.4" rx="1.5" fill="currentColor" opacity="0.65" />
-            <rect y="10.6" width="13" height="3.4" rx="1.5" fill="currentColor" opacity="0.4" />
-          </svg>
-        </div>
-        <div className="brand-name">Aidly</div>
+        <SchoolBrand name={user?.schoolName} logoUrl={user?.schoolLogoUrl} />
         {mobile && (
           <button type="button" className="sidebar-close-btn" onClick={onClose} aria-label="Close menu">
             <Icons.IconClose size={18} />
