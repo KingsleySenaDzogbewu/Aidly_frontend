@@ -7,7 +7,7 @@ export default function AccountCard({ user, roleLabel, delay = 0 }) {
       <div style={{ fontSize: 13, color: 'var(--accent-soft-text)', lineHeight: 1.9 }}>
         <div>Signed in as <strong>{user?.email}</strong></div>
         <div>Role: <strong>{roleLabel}</strong></div>
-        <div>School ID: <strong>{user?.schoolId ?? '—'}</strong></div>
+        <div>School: <strong>{user?.schoolName || (user?.bootstrapAdmin ? 'All schools' : '—')}</strong></div>
       </div>
     </Card>
   );
